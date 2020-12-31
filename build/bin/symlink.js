@@ -1,52 +1,35 @@
 #!/usr/bin/env node
 
-let path  = require('path');
-let fs = require('fs');
-let shell = require('shelljs');
+const path = require('path');
+const ln = require('./linking');
 
-let root = path.dirname(path.dirname(__dirname));
-let options = "-rf";
+const root = path.dirname(path.dirname(__dirname));
 
-function tryLink(module, name, source) {
-	let current = process.cwd();
-	try {
-		process.chdir(path.join(module, 'node_modules'));
-		if (fs.existsSync(name)) {
-			shell.rm(options , name);
-			shell.ln('-s', path.join('..', '..', source), name);
-		}
-	} finally {
-		process.chdir(current);
-	}
-}
+(async function main() {
+	console.log('Symlinking node modules for development setup');
 
-function tryLinkJsonRpc(module) {
-	tryLink(module, 'vscode-jsonrpc', 'jsonrpc');
-}
+	// protocol folder
+	let protocolFolder = path.join(root, 'protocol');
+	await ln.tryLinkJsonRpc(protocolFolder);
+	await ln.tryLinkTypes(protocolFolder);
 
-function tryLinkTypes(module) {
-	tryLink(module, 'vscode-languageserver-types', 'types');
-}
+	// server folder
+	let serverFolder = path.join(root, 'server');
+	await ln.tryLinkJsonRpc(serverFolder);
+	await ln.tryLinkTypes(serverFolder);
+	await ln.tryLinkProtocol(serverFolder);
 
-function tryLinkProtocol(module) {
-	tryLink(module, 'vscode-languageserver-protocol', 'protocol');
-}
+	// client folder
+	let clientFolder = path.join(root, 'client');
+	await ln.tryLinkJsonRpc(clientFolder);
+	await ln.tryLinkTypes(clientFolder);
+	await ln.tryLinkProtocol(clientFolder);
 
-console.log('Symlinking node modules for development setup');
-
-// protocol folder
-let protocolFolder = path.join(root, 'protocol');
-tryLinkJsonRpc(protocolFolder);
-tryLinkTypes(protocolFolder);
-
-// server folder
-let serverFolder = path.join(root, 'server');
-tryLinkJsonRpc(serverFolder);
-tryLinkTypes(serverFolder);
-tryLinkProtocol(serverFolder);
-
-// client folder
-let clientFolder = path.join(root, 'client');
-tryLinkJsonRpc(clientFolder);
-tryLinkTypes(clientFolder);
-tryLinkProtocol(clientFolder);
+	// test-extension
+	let extensionFolder = path.join(root, 'client-node-tests');
+	await ln.tryLinkJsonRpc(extensionFolder);
+	await ln.tryLinkTypes(extensionFolder);
+	await ln.tryLinkProtocol(extensionFolder);
+	await ln.tryLink(extensionFolder, 'vscode-languageserver', path.join('..', '..', 'server'));
+	await ln.tryLink(extensionFolder, 'vscode-languageclient', path.join('..', '..', 'client'));
+})();

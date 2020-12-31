@@ -20,9 +20,58 @@
 
 	"javascript.validate.enable": false,
 
-	"eslint.enable": false,
 	"tslint.enable": false,
-
-	"npm.autoDetect": "off",
-	"typescript.tsc.autoDetect": "off"
+	"eslint.enable": true,
+	"eslint.validate": [
+		"typescript"
+	],
+	"eslint.workingDirectories": [
+		"./types",
+		"./jsonrpc",
+		"./protocol",
+		"./server",
+		"./client",
+		"./client-node-tests"
+	],
+	"typescript.tsc.autoDetect": "off",
+	"spellright.language": [
+		"en"
+	],
+	"spellright.documentTypes": [
+		"markdown",
+		"latex",
+		"plaintext"
+	],
+	"editor.codeActionsOnSave": {
+		"source.fixAll.eslint": true
+	},
+	"cSpell.words": [
+		"ASAR",
+		"LSIF",
+		"Struct",
+		"Unregistration",
+		"XCOPY",
+		"asColorInformations",
+		"asParameterInformations",
+		"asSignatureInformations",
+		"asSymbolInformations",
+		"clazz",
+		"diagnostic's",
+		"hover's",
+		"lsclient",
+		"lsptests",
+		"msgpack",
+		"plugable",
+		"postpublish",
+		"preversion",
+		"quickfix",
+		"refactorings",
+		"serializable",
+		"tsbuild",
+		"uinteger",
+		"unregisteration",
+		"unregisterations",
+		"unregistrations",
+		"whitespaces"
+	]
 }

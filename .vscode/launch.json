@@ -13,8 +13,23 @@
 			"runtimeArgs": [],
 			"env": { },
 			"sourceMaps": true,
-			"outFiles": ["${workspaceRoot}/types/lib/**/*.js"],
-			"preLaunchTask": "watch:types"
+			"outFiles": ["${workspaceRoot}/types/lib/umd/**/*.js"],
+			"preLaunchTask": "npm: watch"
+		},
+		{
+			"request": "launch",
+			"type": "node",
+			"name": "test:textDocument",
+			"program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
+			"stopOnEntry": false,
+			"args": ["--timeout", "999999"],
+			"cwd": "${workspaceRoot}/textDocument",
+			"runtimeExecutable": null,
+			"runtimeArgs": [],
+			"env": { },
+			"sourceMaps": true,
+			"outFiles": ["${workspaceRoot}/textDocument/lib/umd/**/*.js"],
+			"preLaunchTask": "npm: watch"
 		},
 		{
 			"request": "launch",
@@ -29,7 +44,7 @@
 			"env": { },
 			"sourceMaps": true,
 			"outFiles": ["${workspaceRoot}/jsonrpc/lib/**/*.js"],
-			"preLaunchTask": "watch:jsonrpc"
+			"preLaunchTask": "npm: watch"
 		},
 		{
 			"request": "launch",
@@ -44,7 +59,7 @@
 			"env": { },
 			"sourceMaps": true,
 			"outFiles": ["${workspaceRoot}/protocol/lib/**/*.js"],
-			"preLaunchTask": "watch:protocol"
+			"preLaunchTask": "npm: watch"
 		},
 		{
 			"request": "launch",
@@ -59,18 +74,36 @@
 			"env": { },
 			"sourceMaps": true,
 			"outFiles": ["${workspaceRoot}/server/lib/**/*.js"],
-			"preLaunchTask": "watch:server"
+			"preLaunchTask": "npm: watch"
 		},
 		{
 			"type": "extensionHost",
 			"request": "launch",
 			"name": "test:client",
 			"runtimeExecutable": "${execPath}",
-			"args": ["--extensionDevelopmentPath=${workspaceRoot}/client", "--extensionTestsPath=${workspaceRoot}/client/lib/test" ],
+			"args": ["--extensionDevelopmentPath=${workspaceFolder}/client-node-tests", "--extensionTestsPath=${workspaceFolder}/client-node-tests/lib" ],
 			"stopOnEntry": false,
 			"sourceMaps": true,
-			"outFiles": ["${workspaceRoot}/client/lib/test/**/*.js"],
-			"preLaunchTask": "watch:client"
+			"outFiles": ["${workspaceRoot}/client-node-tests/lib/test/**/*.js"],
+			"preLaunchTask": "npm: watch"
+		},
+		{
+			"type": "extensionHost",
+			"request": "launch",
+			"name": "Launch TestBed Client",
+			"runtimeExecutable": "${execPath}",
+			"args": ["--extensionDevelopmentPath=${workspaceRoot}/testbed"],
+			"outFiles": ["${workspaceRoot}/testbed/client/out/**/*.js"],
+			"sourceMaps": true
+		},
+		{
+			"type": "node",
+			"request": "attach",
+			"name": "Attach to Server",
+			"port": 6012,
+			"restart": true,
+			"outFiles": ["${workspaceRoot}/testbed/server/out/**/*.js"],
+			"sourceMaps": true
 		}
 	]
 }

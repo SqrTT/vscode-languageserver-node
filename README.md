@@ -8,6 +8,9 @@ This repository contains the code for the following npm modules:
 * _vscode-languageserver_: npm module to implement a VSCode language server using [Node.js](https://nodejs.org/) as a runtime:<br>
 [![NPM Version](https://img.shields.io/npm/v/vscode-languageserver.svg)](https://npmjs.org/package/vscode-languageserver)
 [![NPM Downloads](https://img.shields.io/npm/dm/vscode-languageserver.svg)](https://npmjs.org/package/vscode-languageserver)
+* _vscode-languageserver-textdocument_: npm module to implement text documents usable in a LSP server using [Node.js](https://nodejs.org/) as a runtime:<br>
+[![NPM Version](https://img.shields.io/npm/v/vscode-languageserver-textdocument.svg)](https://npmjs.org/package/vscode-languageserver-textdocument)
+[![NPM Downloads](https://img.shields.io/npm/dm/vscode-languageserver-textdocument.svg)](https://npmjs.org/package/vscode-languageserver-textdocument)
 * _vscode-languageserver-protocol_: the actual language server protocol definition in TypeScript:<br>
 [![NPM Version](https://img.shields.io/npm/v/vscode-languageserver-protocol.svg)](https://npmjs.org/package/vscode-languageserver-protocol)
 [![NPM Downloads](https://img.shields.io/npm/dm/vscode-languageserver-protocol.svg)](https://npmjs.org/package/vscode-languageserver-protocol)
@@ -25,7 +28,76 @@ All four npm modules are built using one travis build. Its status is:
 Click [here](https://code.visualstudio.com/docs/extensions/example-language-server) for a detailed document on how to use these npm modules to implement
 language servers for [VSCode](https://code.visualstudio.com/).
 
+## Contributing
+
+After cloning the repository, run `npm install` to install dependencies and `npm run symlink` to point packages in this repository to each other.
+
 ## History
+
+## 3.16.0 Protocol, 6.0.0 JSON-RPC, 7.0.0 Client and 7.0.0 Server.
+
+For a detailed list of changes made in the 3.16.0 version of the protocol see the [change log](https://microsoft.github.io/language-server-protocol/specifications/specification-3-16/#version_3_16_0) of the 3.16 specification.
+
+Library specific changes are:
+
+* cleanup of Request and Notification types. Removed the unnecessary generic parameter RO. This is a breaking change. To adapt simply remove the type argument.
+* added the new concept of a RegistrationType which decouple the registration method from the actual request or notification method. This is a breaking change for implementors of custom features. To adapt rename the `messages` property to `registrationType` and return a corresponding `RegistrationType`. Additional remove the first parameter from the `register` method.
+* cleanup of `ErrorCodes`. LSP specific error codes got moved to a new namespace `LSPErrorCodes`. The namespace `ErrorCodes` in `jsonrpc` is not correctly reserved for JSON RPC specific error codes. This is a breaking change. To resolve it use `LSPErrorCodes` instead.
+* split code into common, node and browser to allow using the LSP client and server npm modules in a Web browser via webpack. This is a **breaking change** and might lead to compile / runtime errors if not adopted. Every module has now three different exports which represent the split into common, node and browser. Lets look at `vscode-jsonrpc` for an example: (a) the import `vscode-jsonrpc` will only import the common code, (b) the import `vscode-jsonrpc\node` will import the common and the node code and (c) the import `vscode-jsonrpc\browser` will import the common and browser code.
+* added support to control the [parameter structure](https://www.jsonrpc.org/specification#parameter_structures) when sending requests and notifications in `vscode-jsonrpc`. The parameter structure can be controlled using the additional `parameterStructures` argument when creating a request or notification type or when sending an untyped request or notification using the `sendRequest` or `sendNotification` function. The default is `ParameterStructures.auto` which does the following:
+  * use `byPosition` for messages with zero or greater than one parameter
+  * for one parameter it used `byName` for parameters which are object literals. Uses `byPosition` for all other parameters.
+
+
+## 3.15.3 Protocol, 6.1.x client and 6.1.x server
+
+* Small changes to the proposed support for semantic tokens.
+
+## 3.15.2 Protocol, 6.1.x client and 6.1.x server
+
+* Proposed support for semantic tokens.
+
+## 3.15.0 Protocol, 6.0.0 Client & 6.0.0 Server
+
+* Progress support for work done and partial result progress.
+* Proposed implementation for call hierarchies.
+* `SelectionRangeRequest` protocol added:
+  * New APIs in Types: `SelectionRange`
+  * New APIs in Protocol: `SelectionRangeRequest`, `SelectionRangeParams`, `SelectionRangeClientCapabilities`, `SelectionRangeServerCapabilities`, `SelectionRangeProviderOptions`,
+* Support for custom text document implementations:
+  * new npm package `vscode-languageserver-textdocument` which ships a standard text document implementation with basic incremental update. Server now need to pre-requisite this npm package.
+  * deprecated text document implementation in types.
+  * this resulted in a small breakage on the server side. Instead of doing `new TextDocuments` you now have to pass in a text document configuration to provide callbacks to create and update a text document. Here are examples in TypeScript and JavaScript
+
+```ts
+import { TextDocuments } from 'vscode-languageserver';
+import { TextDocument } from 'vscode-languageserver-textdocument';
+const documents = new TextDocuments(TextDocument);
+```
+
+```js
+const server = require("vscode-languageserver");
+const textDocument = require("vscode-languageserver-textdocument");
+const documents = new server.TextDocuments(textDocument.TextDocument);
+```
+
+### 5.1.1 Client
+
+* Fixes [[textDocument/rename] client doesn't obey `RenameOptions` while registering provider](https://github.com/Microsoft/vscode-languageserver-node/issues/416)
+
+### 5.1.0 Client & 5.1.0 Server
+
+* Adopt protocol version 3.13.0
+
+### 3.13.0 Protocol
+
+* `FoldingRangeRequestParam` renamed to 'FoldingRangeParams' (`FoldingRangeRequestParam` still provided for backward compatibility)
+* Added support for create, rename and delete file operations in workspace edits.
+
+### 5.0.0 Client & 5.0.0 Server
+
+* Make the client work with Electron 2.x. which is used since VS Code 1.26.x
+* Check that the expected client version specified in `engines.vscode` in the `package.json` file matches the VS Code version the client is running on.
 
 ### 4.4.0 Client & 4.4.0 Server & 3.10.0 Protocol
 
@@ -56,7 +128,7 @@ language servers for [VSCode](https://code.visualstudio.com/).
 
 * Add support for related information in diagnostics.
 
-* [Initialisation exceptions swallowed](https://github.com/Microsoft/vscode-languageserver-node/issues/330)
+* [Initialization exceptions swallowed](https://github.com/Microsoft/vscode-languageserver-node/issues/330)
 * [Errors from rename still not shown in VSCode](https://github.com/Microsoft/vscode-languageserver-node/issues/329)
 * [terminateProcess.sh is not shipped in dist package](https://github.com/Microsoft/vscode-languageserver-node/issues/331)
 * [Add middleware to intercept textDocument/publishDiagnostics](https://github.com/Microsoft/vscode-languageserver-node/pull/322)
@@ -68,18 +140,27 @@ language servers for [VSCode](https://code.visualstudio.com/).
 ### 4.0.0 Server and Client
 
 * implemented the latest protocol additions. Noteworthy are completion context, extensible completion item and symbol kind as well as markdown support for completion item and signature help. Moved to 4.0.0 version since the introduction of the completion context required a breaking change in the client middleware. The old signature:
-```typescript
+```ts
 provideCompletionItem?: (this: void, document: TextDocument, position: VPosition, token: CancellationToken, next: ProvideCompletionItemsSignature) => ProviderResult<VCompletionItem[] | VCompletionList>;
 ```
 contains now an additional argument `context`:
-```typescript
+```ts
 provideCompletionItem?: (this: void, document: TextDocument, position: VPosition, context: VCompletionContext, token: CancellationToken, next: ProvideCompletionItemsSignature) => ProviderResult<VCompletionItem[] | VCompletionList>;
 ```
 
 * Noteworthy fixes:
   * [Getting value after executing command programmatically](https://github.com/Microsoft/language-server-protocol/issues/329)
   * [Experiencing infinite recursion in this code in VSCode 1.18.1](https://github.com/Microsoft/language-server-protocol/issues/279)
-  * [LangaueClient#handleConnectionClosed fails to restart if this._resolvedConnection.dispose() throws](https://github.com/Microsoft/vscode-languageserver-node/issues/286)
+  * [LanguageClient#handleConnectionClosed fails to restart if this._resolvedConnection.dispose() throws](https://github.com/Microsoft/vscode-languageserver-node/issues/286)
+
+### 6.0.0 Server and Client
+
+* Move to Protocol 3.15.0
+* move JS target to ES2017
+
+### 3.15.0 Types and Protocol
+
+* Implement LSP 3.15.0
 
 ### 3.6.1 Types
 * ESM added as output format (for Webpack and other ESM consumers)
@@ -101,7 +182,7 @@ provideCompletionItem?: (this: void, document: TextDocument, position: VPosition
 ### 3.3.0 Server and Client
 
 * splitted the client into a base client and a main client to support reusing the client implementation in other environments.
-* made the request processing more async. So instead of processing a request immediatelly when the code gets notified by a Node.js callback the request is now put into a queue and processed from the queue. This allows for better dropping or folding of events if necessary.
+* made the request processing more async. So instead of processing a request immediately when the code gets notified by a Node.js callback the request is now put into a queue and processed from the queue. This allows for better dropping or folding of events if necessary.
 * bugs fixes see [April](https://github.com/Microsoft/vscode-languageserver-node/issues?q=is%3Aissue+milestone%3A%22April+2017%22+is%3Aclosed) and [May](https://github.com/Microsoft/vscode-languageserver-node/issues?q=is%3Aissue+is%3Aclosed+milestone%3A%22Mai+2017%22)
 
 ### 3.2.1 Server and Client
@@ -136,7 +217,7 @@ provideCompletionItem?: (this: void, document: TextDocument, position: VPosition
 * Support for the 3.0 version of the [Language Server protocol](https://github.com/Microsoft/language-server-protocol). Some highlights are:
   * Support for feature flags.
   * Support for dynamic registration. In the 2.x version of the library a server announced its capabilities statically. In 3.x the server
-    can now dynamically register and unregister capability handlers using the new requests `client/registerCapability` and `client/unregisterCapability`.
+    can now dynamically register and un-register capability handlers using the new requests `client/registerCapability` and `client/unregisterCapability`.
   * Support to delegate command execution via a new request `workspace/executeCommand` to the server.
 * Support for snippets in completion items:
   * New type `InsertTextFormat`
@@ -195,7 +276,7 @@ export namespace MyNotification {
 * Events for starting and stopping the server.
 * Initialization options can be provided as a function.
 * Support for stdio / stderr encoding.
-* Support to convert URIs betweeen the client and the server.
+* Support to convert URIs between the client and the server.
 * Server connection.console logging now appears in the corresponding output channel instead of in the developer console.
 * If a non stdio communication channel is used between client and server the server's stdio is redirected to the output channel.
 * A client can now have an id and a name.
@@ -206,9 +287,9 @@ export namespace MyNotification {
 
 ### 2.3.0: Client only
 
-* the client now restarts the server if the server crashes without a prior exit notification sent. The strategy used to restart the server is pluggable (see `LanguageClientOptions.errorHandler`). The default strategy restart the server unless it crashed 5 times or more in the last 3 minutes.
+* the client now restarts the server if the server crashes without a prior exit notification sent. The strategy used to restart the server is plugable (see `LanguageClientOptions.errorHandler`). The default strategy restart the server unless it crashed 5 times or more in the last 3 minutes.
 
-### 2.0: A detailed desciption of the 2.0 version can be found [here](https://github.com/Microsoft/vscode-languageserver-protocol/blob/master/README.md). A summary of the changes:
+### 2.0: A detailed description of the 2.0 version can be found [here](https://github.com/Microsoft/vscode-languageserver-protocol/blob/master/README.md). A summary of the changes:
 
 * support for request cancellation. Cancellation is automatically hooked to VSCode's cancellation tokens
 * document save notification.
@@ -236,7 +317,7 @@ export namespace MyNotification {
 * List Document Symbols: lists all symbols defined in a text document.
 * List Workspace Symbols: lists all project-wide symbols.
 
-### 0.10.x: Intial versions to build a good API for the client and server side
+### 0.10.x: Initial versions to build a good API for the client and server side
 
 
 ## License

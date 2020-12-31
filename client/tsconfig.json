@@ -1,18 +1,10 @@
 {
-	"extends": "../tsconfig.base.json",
-	"compilerOptions": {
-		"target": "es6",
-		"module": "commonjs",
-		"moduleResolution": "node",
-		"sourceMap": false,
-		"inlineSources": false,
-		"declaration": true,
-		"stripInternal": true,
-		"lib": [ "es2016" ],
-		"outDir": "lib",
-		"rootDir": "src"
-	},
-	"include": [
-		"src"
+	"extends": "./tsconfig.base.json",
+	"files": [],
+	"references": [
+		{ "path": "../protocol/tsconfig.json" },
+		{ "path": "./src/common/tsconfig.json" },
+		{ "path": "./src/node/tsconfig.json" },
+		{ "path": "./src/browser/tsconfig.json" }
 	]
 }

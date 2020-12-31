@@ -20,7 +20,7 @@ let connection = rpc.createMessageConnection(
 	new rpc.StreamMessageReader(childProcess.stdout),
 	new rpc.StreamMessageWriter(childProcess.stdin));
 
-let notification = new NotificationType<string, void>('testNotification');
+let notification = new rpc.NotificationType<string, void>('testNotification');
 
 connection.listen();
 
@@ -37,7 +37,7 @@ let connection = rpc.createMessageConnection(
 	new rpc.StreamMessageReader(process.stdin),
 	new rpc.StreamMessageWriter(process.stdout));
 
-let notification = new NotificationType<string, void>('testNotification');
+let notification = new rpc.NotificationType<string, void>('testNotification');
 connection.onNotification(notification, (param: string) => {
 	console.log(param); // This prints Hello World
 });
@@ -46,6 +46,15 @@ connection.listen();
 ```
 
 # History
+
+### 5.0.0
+
+- add progress support
+- move JS target to ES2017
+
+### 4.0.0
+
+- move JS target to ES6.
 
 ### 3.0.0:
 

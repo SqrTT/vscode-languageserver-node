@@ -1,9 +1,49 @@
-
 /* --------------------------------------------------------------------------------------------
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Licensed under the MIT License. See License.txt in the project root for license information.
  * ------------------------------------------------------------------------------------------ */
 'use strict';
+
+/**
+ * A tagging type for string properties that are actually document URIs.
+ */
+export type DocumentUri = string;
+
+/**
+ * A tagging type for string properties that are actually URIs
+ *
+ * @since 3.16.0
+ */
+export type URI = string;
+
+/**
+ * Defines an integer in the range of -2^31 to 2^31 - 1.
+ */
+export type integer = number;
+
+export namespace integer {
+	export const MIN_VALUE = -2147483648;
+	export const MAX_VALUE = 2147483647;
+}
+
+/**
+ * Defines an unsigned integer in the range of 0 to 2^31 - 1.
+ */
+export type uinteger = number;
+
+export namespace uinteger {
+	export const MIN_VALUE = 0;
+	export const MAX_VALUE = 2147483647;
+}
+
+/**
+ * Defines a decimal number. Since decimal numbers are very
+ * rare in the language server specification we denote the
+ * exact range with every decimal using the mathematics
+ * interval notations (e.g. [0, 1] denotes all decimals d with
+ * 0 <= d <= 1.
+ */
+export type decimal = number;
 
 /**
  * Position in a text document expressed as zero-based line and character offset.
@@ -18,10 +58,8 @@
 export interface Position {
 	/**
 	 * Line position in a document (zero-based).
-	 * If a line number is greater than the number of lines in a document, it defaults back to the number of lines in the document.
-	 * If a line number is negative, it defaults to 0.
 	 */
-	line: number;
+	line: uinteger;
 
 	/**
 	 * Character offset on a line in a document (zero-based). Assuming that the line is
@@ -30,9 +68,8 @@ export interface Position {
 	 *
 	 * If the character value is greater than the line length it defaults back to the
 	 * line length.
-	 * If a line number is negative, it defaults to 0.
 	 */
-	character: number;
+	character: uinteger;
 }
 
 /**
@@ -45,15 +82,17 @@ export namespace Position {
 	 * @param line The position's line.
 	 * @param character The position's character.
 	 */
-	export function create(line: number, character: number): Position {
+	export function create(line: uinteger, character: uinteger): Position {
+		if (line === Number.MAX_VALUE) { line = uinteger.MAX_VALUE; }
+		if (character === Number.MAX_VALUE) { character = uinteger.MAX_VALUE; }
 		return { line, character };
 	}
 	/**
-	 * Checks whether the given liternal conforms to the [Position](#Position) interface.
+	 * Checks whether the given literal conforms to the [Position](#Position) interface.
 	 */
 	export function is(value: any): value is Position {
 		let candidate = value as Position;
-		return Is.objectLiteral(candidate) && Is.number(candidate.line) && Is.number(candidate.character);
+		return Is.objectLiteral(candidate) && Is.uinteger(candidate.line) && Is.uinteger(candidate.character);
 	}
 }
 
@@ -88,21 +127,21 @@ export interface Range {
  */
 export namespace Range {
 	/**
-	 * Create a new Range liternal.
+	 * Create a new Range literal.
 	 * @param start The range's start position.
 	 * @param end The range's end position.
 	 */
 	export function create(start: Position, end: Position): Range;
 	/**
-	 * Create a new Range liternal.
+	 * Create a new Range literal.
 	 * @param startLine The start line number.
 	 * @param startCharacter The start character.
 	 * @param endLine The end line number.
 	 * @param endCharacter The end character.
 	 */
-	export function create(startLine: number, startCharacter: number, endLine: number, endCharacter: number): Range;
-	export function create(one: Position | number, two: Position | number, three?: number, four?: number): Range {
-		if (Is.number(one) && Is.number(two) && Is.number(three) && Is.number(four)) {
+	export function create(startLine: uinteger, startCharacter: uinteger, endLine: uinteger, endCharacter: uinteger): Range;
+	export function create(one: Position | uinteger, two: Position | uinteger, three?: uinteger, four?: uinteger): Range {
+		if (Is.uinteger(one) && Is.uinteger(two) && Is.uinteger(three) && Is.uinteger(four)) {
 			return { start: Position.create(one, two), end: Position.create(three, four) };
 		} else if (Position.is(one) && Position.is(two)) {
 			return { start: one, end: two };
@@ -124,7 +163,7 @@ export namespace Range {
  * inside a text file.
  */
 export interface Location {
-	uri: string;
+	uri: DocumentUri;
 	range: Range;
 }
 
@@ -138,7 +177,7 @@ export namespace Location {
 	 * @param uri The location's uri.
 	 * @param range The location's range.
 	 */
-	export function create(uri: string, range: Range): Location {
+	export function create(uri: DocumentUri, range: Range): Location {
 		return { uri, range };
 	}
 	/**
@@ -151,6 +190,66 @@ export namespace Location {
 }
 
 /**
+	 * Represents the connection of two locations. Provides additional metadata over normal [locations](#Location),
+	 * including an origin range.
+ */
+export interface LocationLink {
+	/**
+	 * Span of the origin of this link.
+	 *
+	 * Used as the underlined span for mouse definition hover. Defaults to the word range at
+	 * the definition position.
+	 */
+	originSelectionRange?: Range;
+
+	/**
+	 * The target resource identifier of this link.
+	 */
+	targetUri: DocumentUri;
+
+	/**
+	 * The full target range of this link. If the target for example is a symbol then target range is the
+	 * range enclosing this symbol not including leading/trailing whitespace but everything else
+	 * like comments. This information is typically used to highlight the range in the editor.
+	 */
+	targetRange: Range;
+
+	/**
+	 * The range that should be selected and revealed when this link is being followed, e.g the name of a function.
+	 * Must be contained by the the `targetRange`. See also `DocumentSymbol#range`
+	 */
+	targetSelectionRange: Range;
+}
+
+/**
+ * The LocationLink namespace provides helper functions to work with
+ * [LocationLink](#LocationLink) literals.
+ */
+export namespace LocationLink {
+
+	/**
+	 * Creates a LocationLink literal.
+	 * @param targetUri The definition's uri.
+	 * @param targetRange The full range of the definition.
+	 * @param targetSelectionRange The span of the symbol definition at the target.
+	 * @param originSelectionRange The span of the symbol being defined in the originating source file.
+	 */
+	export function create(targetUri: DocumentUri, targetRange: Range, targetSelectionRange: Range, originSelectionRange?: Range): LocationLink {
+		return { targetUri, targetRange, targetSelectionRange, originSelectionRange };
+	}
+
+	/**
+	 * Checks whether the given literal conforms to the [LocationLink](#LocationLink) interface.
+	 */
+	export function is(value: any): value is LocationLink {
+		let candidate = value as LocationLink;
+		return Is.defined(candidate) && Range.is(candidate.targetRange) && Is.string(candidate.targetUri)
+			&& (Range.is(candidate.targetSelectionRange) || Is.undefined(candidate.targetSelectionRange))
+			&& (Range.is(candidate.originSelectionRange) || Is.undefined(candidate.originSelectionRange));
+	}
+}
+
+/**
  * Represents a color in RGBA space.
  */
 export interface Color {
@@ -158,22 +257,22 @@ export interface Color {
 	/**
 	 * The red component of this color in the range [0-1].
 	 */
-	readonly red: number;
+	readonly red: decimal;
 
 	/**
 	 * The green component of this color in the range [0-1].
 	 */
-	readonly green: number;
+	readonly green: decimal;
 
 	/**
 	 * The blue component of this color in the range [0-1].
 	 */
-	readonly blue: number;
+	readonly blue: decimal;
 
 	/**
 	 * The alpha component of this color in the range [0-1].
 	 */
-	readonly alpha: number;
+	readonly alpha: decimal;
 }
 
 /**
@@ -184,7 +283,7 @@ export namespace Color {
 	/**
 	 * Creates a new Color literal.
 	 */
-	export function create(red: number, green: number, blue: number, alpha: number): Color {
+	export function create(red: decimal, green: decimal, blue: decimal, alpha: decimal): Color {
 		return {
 			red,
 			green,
@@ -198,10 +297,10 @@ export namespace Color {
 	 */
 	export function is(value: any): value is Color {
 		const candidate = value as Color;
-		return Is.number(candidate.red)
-			&& Is.number(candidate.green)
-			&& Is.number(candidate.blue)
-			&& Is.number(candidate.alpha);
+		return Is.numberRange(candidate.red, 0, 1)
+			&& Is.numberRange(candidate.green, 0, 1)
+			&& Is.numberRange(candidate.blue, 0, 1)
+			&& Is.numberRange(candidate.alpha, 0, 1);
 	}
 }
 
@@ -211,7 +310,7 @@ export namespace Color {
 export interface ColorInformation {
 
 	/**
-	 * The range in the document where this color appers.
+	 * The range in the document where this color appears.
 	 */
 	range: Range;
 
@@ -288,7 +387,7 @@ export namespace ColorPresentation {
 		const candidate = value as ColorPresentation;
 		return Is.string(candidate.label)
 			&& (Is.undefined(candidate.textEdit) || TextEdit.is(candidate))
-			&& (Is.undefined(candidate.additionalTextEdits) || Is.typedArray<DiagnosticRelatedInformation>(candidate.additionalTextEdits, TextEdit.is));
+			&& (Is.undefined(candidate.additionalTextEdits) || Is.typedArray(candidate.additionalTextEdits, TextEdit.is));
 	}
 }
 
@@ -311,29 +410,32 @@ export enum FoldingRangeKind {
 }
 
 /**
- * Represents a folding range.
+ * Represents a folding range. To be valid, start and end line must be bigger than zero and smaller
+ * than the number of lines in the document. Clients are free to ignore invalid ranges.
  */
 export interface FoldingRange {
 
 	/**
-	 * The zero-based line number from where the folded range starts.
+	 * The zero-based start line of the range to fold. The folded area starts after the line's last character.
+	 * To be valid, the end must be zero or larger and smaller than the number of lines in the document.
 	 */
-	startLine: number;
+	startLine: uinteger;
 
 	/**
 	 * The zero-based character offset from where the folded range starts. If not defined, defaults to the length of the start line.
 	 */
-	startCharacter?: number;
+	startCharacter?: uinteger;
 
 	/**
-	 * The zero-based line number where the folded range ends.
+	 * The zero-based end line of the range to fold. The folded area ends with the line's last character.
+	 * To be valid, the end must be zero or larger and smaller than the number of lines in the document.
 	 */
-	endLine: number;
+	endLine: uinteger;
 
 	/**
 	 * The zero-based character offset before the folded range ends. If not defined, defaults to the length of the end line.
 	 */
-	endCharacter?: number;
+	endCharacter?: uinteger;
 
 	/**
 	 * Describes the kind of the folding range such as `comment' or 'region'. The kind
@@ -351,7 +453,7 @@ export namespace FoldingRange {
 	/**
 	 * Creates a new FoldingRange literal.
 	 */
-	export function create(startLine: number, endLine: number, startCharacter?: number, endCharacter?: number, kind?: string): FoldingRange {
+	export function create(startLine: uinteger, endLine: uinteger, startCharacter?: uinteger, endCharacter?: uinteger, kind?: string): FoldingRange {
 		const result: FoldingRange = {
 			startLine,
 			endLine
@@ -373,10 +475,10 @@ export namespace FoldingRange {
 	 */
 	export function is(value: any): value is FoldingRange {
 		const candidate = value as FoldingRange;
-		return Is.number(candidate.startLine) && Is.number(candidate.startLine)
-			&& (Is.undefined(candidate.startCharacter) || Is.number(candidate.startCharacter))
-			&& (Is.undefined(candidate.endCharacter) || Is.number(candidate.endCharacter))
-			&& (Is.undefined(candidate.kind) || Is.string(candidate.kind))
+		return Is.uinteger(candidate.startLine) && Is.uinteger(candidate.startLine)
+			&& (Is.undefined(candidate.startCharacter) || Is.uinteger(candidate.startCharacter))
+			&& (Is.undefined(candidate.endCharacter) || Is.uinteger(candidate.endCharacter))
+			&& (Is.undefined(candidate.kind) || Is.string(candidate.kind));
 	}
 }
 
@@ -447,6 +549,55 @@ export namespace DiagnosticSeverity {
 export type DiagnosticSeverity = 1 | 2 | 3 | 4;
 
 /**
+ * The diagnostic tags.
+ *
+ * @since 3.15.0
+ */
+export namespace DiagnosticTag {
+
+	/**
+	 * Unused or unnecessary code.
+	 *
+	 * Clients are allowed to render diagnostics with this tag faded out instead of having
+	 * an error squiggle.
+	 */
+	export const Unnecessary: 1 = 1;
+
+	/**
+	 * Deprecated or obsolete code.
+	 *
+	 * Clients are allowed to rendered diagnostics with this tag strike through.
+	 */
+	export const Deprecated: 2 = 2;
+}
+
+export type DiagnosticTag = 1 | 2;
+
+/**
+ * Structure to capture a description for an error code.
+ *
+ * @since 3.16.0
+ */
+export interface CodeDescription {
+	/**
+	 * An URI to open with more information about the diagnostic error.
+	 */
+	href: URI;
+}
+
+/**
+ * The CodeDescription namespace provides functions to deal with descriptions for diagnostic codes.
+ *
+ * @since 3.16.0
+ */
+export namespace CodeDescription {
+	export function is(value: CodeDescription | undefined | null): value is CodeDescription {
+		const candidate: CodeDescription = value as CodeDescription;
+		return candidate !== undefined && candidate !== null && Is.string(candidate.href);
+	}
+}
+
+/**
  * Represents a diagnostic, such as a compiler error or warning. Diagnostic objects
  * are only valid in the scope of a resource.
  */
@@ -463,26 +614,49 @@ export interface Diagnostic {
 	severity?: DiagnosticSeverity;
 
 	/**
-	 * The diagnostic's code, which might appear in the user interface.
+	 * The diagnostic's code, which usually appear in the user interface.
 	 */
-	code?: number | string;
+	code?: integer | string;
+
+	/**
+	 * An optional property to describe the error code.
+	 *
+	 * @since 3.16.0
+	 */
+	codeDescription?: CodeDescription;
 
 	/**
 	 * A human-readable string describing the source of this
-	 * diagnostic, e.g. 'typescript' or 'super lint'.
+	 * diagnostic, e.g. 'typescript' or 'super lint'. It usually
+	 * appears in the user interface.
 	 */
 	source?: string;
 
 	/**
-	 * The diagnostic's message.
+	 * The diagnostic's message. It usually appears in the user interface
 	 */
 	message: string;
+
+	/**
+	 * Additional metadata about the diagnostic.
+	 *
+	 * @since 3.15.0
+	 */
+	tags?: DiagnosticTag[];
 
 	/**
 	 * An array of related diagnostic information, e.g. when symbol-names within
 	 * a scope collide all definitions can be marked via this property.
 	 */
 	relatedInformation?: DiagnosticRelatedInformation[];
+
+	/**
+	 * A data entry field that is preserved between a `textDocument/publishDiagnostics`
+	 * notification and `textDocument/codeAction` request.
+	 *
+	 * @since 3.16.0
+	 */
+	data?: unknown;
 }
 
 /**
@@ -493,7 +667,7 @@ export namespace Diagnostic {
 	/**
 	 * Creates a new Diagnostic literal.
 	 */
-	export function create(range: Range, message: string, severity?: DiagnosticSeverity, code?: number | string, source?: string, relatedInformation?: DiagnosticRelatedInformation[]): Diagnostic {
+	export function create(range: Range, message: string, severity?: DiagnosticSeverity, code?: integer | string, source?: string, relatedInformation?: DiagnosticRelatedInformation[]): Diagnostic {
 		let result: Diagnostic = { range, message };
 		if (Is.defined(severity)) {
 			result.severity = severity;
@@ -519,7 +693,8 @@ export namespace Diagnostic {
 			&& Range.is(candidate.range)
 			&& Is.string(candidate.message)
 			&& (Is.number(candidate.severity) || Is.undefined(candidate.severity))
-			&& (Is.number(candidate.code) || Is.string(candidate.code) || Is.undefined(candidate.code))
+			&& (Is.integer(candidate.code) || Is.string(candidate.code) || Is.undefined(candidate.code))
+			&& (Is.undefined(candidate.codeDescription) || (Is.string(candidate.codeDescription?.href)))
 			&& (Is.string(candidate.source) || Is.undefined(candidate.source))
 			&& (Is.undefined(candidate.relatedInformation) || Is.typedArray<DiagnosticRelatedInformation>(candidate.relatedInformation, DiagnosticRelatedInformation.is));
 	}
@@ -627,20 +802,132 @@ export namespace TextEdit {
 	}
 }
 
+/**
+ * Additional information that describes document changes.
+ *
+ * @since 3.16.0
+ */
+export interface ChangeAnnotation {
+        /**
+         * A human-readable string describing the actual change. The string
+		 * is rendered prominent in the user interface.
+         */
+        label: string;
+
+        /**
+         * A flag which indicates that user confirmation is needed
+		 * before applying the change.
+         */
+        needsConfirmation?: boolean;
+
+        /**
+         * A human-readable string which is rendered less prominent in
+		 * the user interface.
+         */
+        description?: string;
+}
+
+export namespace ChangeAnnotation {
+	export function create(label: string, needsConfirmation?: boolean, description?: string): ChangeAnnotation {
+		const result: ChangeAnnotation = { label };
+		if (needsConfirmation !== undefined) {
+			result.needsConfirmation = needsConfirmation;
+		}
+		if (description !== undefined) {
+			result.description = description;
+		}
+		return result;
+	}
+	export function is(value: any): value is ChangeAnnotation {
+		const candidate = value as ChangeAnnotation;
+		return candidate !== undefined && Is.objectLiteral(candidate) && Is.string(candidate.label) &&
+			(Is.boolean(candidate.needsConfirmation) || candidate.needsConfirmation === undefined) &&
+			(Is.string(candidate.description) || candidate.description === undefined);
+	}
+}
+
+export namespace ChangeAnnotationIdentifier {
+	export function is(value: any): value is ChangeAnnotationIdentifier {
+		const candidate = value as ChangeAnnotationIdentifier;
+		return typeof candidate === 'string';
+	}
+}
 
 /**
- * Describes textual changes on a text document.
+ * An identifier to refer to a change annotation stored with a workspace edit.
+ */
+export type ChangeAnnotationIdentifier = string;
+
+/**
+ * A special text edit with an additional change annotation.
+ *
+ * @since 3.16.0.
+ */
+export interface AnnotatedTextEdit extends TextEdit {
+	/**
+	 * The actual identifier of the change annotation
+	 */
+	annotationId: ChangeAnnotationIdentifier;
+}
+
+export namespace AnnotatedTextEdit {
+
+	/**
+	 * Creates an annotated replace text edit.
+	 *
+	 * @param range The range of text to be replaced.
+	 * @param newText The new text.
+	 * @param annotation The annotation.
+	 */
+	export function replace(range: Range, newText: string, annotation: ChangeAnnotationIdentifier): AnnotatedTextEdit {
+		return { range, newText, annotationId: annotation };
+	}
+	/**
+	 * Creates an annotated insert text edit.
+	 *
+	 * @param position The position to insert the text at.
+	 * @param newText The text to be inserted.
+	 * @param annotation The annotation.
+	 */
+	export function insert(position: Position, newText: string, annotation: ChangeAnnotationIdentifier): AnnotatedTextEdit {
+		return { range: { start: position, end: position }, newText, annotationId: annotation };
+	}
+	/**
+	 * Creates an annotated delete text edit.
+	 *
+	 * @param range The range of text to be deleted.
+	 * @param annotation The annotation.
+	 */
+	export function del(range: Range, annotation: ChangeAnnotationIdentifier): AnnotatedTextEdit {
+		return { range, newText: '', annotationId: annotation };
+	}
+
+	export function is(value: any): value is AnnotatedTextEdit {
+		const candidate: AnnotatedTextEdit = value as AnnotatedTextEdit;
+		return TextEdit.is(candidate) && (ChangeAnnotation.is(candidate.annotationId) || ChangeAnnotationIdentifier.is(candidate.annotationId));
+	}
+}
+
+
+/**
+ * Describes textual changes on a text document. A TextDocumentEdit describes all changes
+ * on a document version Si and after they are applied move the document to version Si+1.
+ * So the creator of a TextDocumentEdit doesn't need to sort the array of edits or do any
+ * kind of ordering. However the edits must be non overlapping.
  */
 export interface TextDocumentEdit {
 	/**
 	 * The text document to change.
 	 */
-	textDocument: VersionedTextDocumentIdentifier;
+	textDocument: OptionalVersionedTextDocumentIdentifier;
 
 	/**
 	 * The edits to be applied.
+	 *
+	 * @since 3.16.0 - support for AnnotatedTextEdit. This is guarded using a
+	 * client capability.
 	 */
-	edits: TextEdit[];
+	edits: (TextEdit | AnnotatedTextEdit)[];
 }
 
 /**
@@ -651,15 +938,221 @@ export namespace TextDocumentEdit {
 	/**
 	 * Creates a new `TextDocumentEdit`
 	 */
-	export function create(textDocument: VersionedTextDocumentIdentifier, edits: TextEdit[]): TextDocumentEdit {
+	export function create(textDocument: OptionalVersionedTextDocumentIdentifier, edits: (TextEdit | AnnotatedTextEdit)[]): TextDocumentEdit {
 		return { textDocument, edits };
 	}
 
 	export function is(value: any): value is TextDocumentEdit {
 		let candidate = value as TextDocumentEdit;
 		return Is.defined(candidate)
-			&& VersionedTextDocumentIdentifier.is(candidate.textDocument)
+			&& OptionalVersionedTextDocumentIdentifier.is(candidate.textDocument)
 			&& Array.isArray(candidate.edits);
+	}
+}
+
+/**
+ * A generic resource operation.
+ */
+interface ResourceOperation {
+	/**
+	 * The resource operation kind.
+	 */
+	kind: string;
+
+	/**
+	 * An optional annotation identifier describing the operation.
+	 *
+	 * @since 3.16.0
+	 */
+	annotationId?: ChangeAnnotationIdentifier;
+}
+
+/**
+ * Options to create a file.
+ */
+export interface CreateFileOptions {
+	/**
+	 * Overwrite existing file. Overwrite wins over `ignoreIfExists`
+	 */
+	overwrite?: boolean;
+
+	/**
+	 * Ignore if exists.
+	 */
+	ignoreIfExists?: boolean;
+}
+
+/**
+ * Create file operation.
+ */
+export interface CreateFile extends ResourceOperation {
+	/**
+	 * A create
+	 */
+	kind: 'create';
+
+	/**
+	 * The resource to create.
+	 */
+	uri: DocumentUri;
+
+	/**
+	 * Additional options
+	 */
+	options?: CreateFileOptions;
+}
+
+export namespace CreateFile {
+	export function create(uri: DocumentUri, options?: CreateFileOptions, annotation?: ChangeAnnotationIdentifier): CreateFile {
+		let result: CreateFile = {
+			kind: 'create',
+			uri
+		};
+		if (options !== undefined && (options.overwrite !== undefined || options.ignoreIfExists !== undefined)) {
+			result.options = options;
+		}
+		if (annotation !== undefined) {
+			result.annotationId = annotation;
+		}
+		return result;
+	}
+
+	export function is(value: any): value is CreateFile {
+		let candidate: CreateFile = value;
+		return candidate && candidate.kind === 'create' && Is.string(candidate.uri) && (
+			candidate.options === undefined ||
+			((candidate.options.overwrite === undefined || Is.boolean(candidate.options.overwrite)) && (candidate.options.ignoreIfExists === undefined || Is.boolean(candidate.options.ignoreIfExists)))
+		) && (
+			candidate.annotationId === undefined || ChangeAnnotationIdentifier.is(candidate.annotationId)
+		);
+	}
+}
+
+/**
+ * Rename file options
+ */
+export interface RenameFileOptions {
+	/**
+	 * Overwrite target if existing. Overwrite wins over `ignoreIfExists`
+	 */
+	overwrite?: boolean;
+
+	/**
+	 * Ignores if target exists.
+	 */
+	ignoreIfExists?: boolean;
+}
+
+/**
+ * Rename file operation
+ */
+export interface RenameFile extends ResourceOperation {
+	/**
+	 * A rename
+	 */
+	kind: 'rename';
+
+	/**
+	 * The old (existing) location.
+	 */
+	oldUri: DocumentUri;
+
+	/**
+	 * The new location.
+	 */
+	newUri: DocumentUri;
+
+	/**
+	 * Rename options.
+	 */
+	options?: RenameFileOptions;
+}
+
+export namespace RenameFile {
+	export function create(oldUri: DocumentUri, newUri: DocumentUri, options?: RenameFileOptions, annotation?: ChangeAnnotationIdentifier): RenameFile {
+		let result: RenameFile = {
+			kind: 'rename',
+			oldUri,
+			newUri
+		};
+		if (options !== undefined && (options.overwrite !== undefined || options.ignoreIfExists !== undefined)) {
+			result.options = options;
+		}
+		if (annotation !== undefined) {
+			result.annotationId = annotation;
+		}
+		return result;
+	}
+
+	export function is(value: any): value is RenameFile {
+		let candidate: RenameFile = value;
+		return candidate && candidate.kind === 'rename' && Is.string(candidate.oldUri) && Is.string(candidate.newUri) && (
+			candidate.options === undefined ||
+			((candidate.options.overwrite === undefined || Is.boolean(candidate.options.overwrite)) && (candidate.options.ignoreIfExists === undefined || Is.boolean(candidate.options.ignoreIfExists)))
+		) && (
+			candidate.annotationId === undefined || ChangeAnnotationIdentifier.is(candidate.annotationId)
+		);
+	}
+}
+
+/**
+ * Delete file options
+ */
+export interface DeleteFileOptions {
+	/**
+	 * Delete the content recursively if a folder is denoted.
+	 */
+	recursive?: boolean;
+
+	/**
+	 * Ignore the operation if the file doesn't exist.
+	 */
+	ignoreIfNotExists?: boolean;
+}
+
+/**
+ * Delete file operation
+ */
+export interface DeleteFile extends ResourceOperation {
+	/**
+	 * A delete
+	 */
+	kind: 'delete';
+
+	/**
+	 * The file to delete.
+	 */
+	uri: DocumentUri;
+
+	/**
+	 * Delete options.
+	 */
+	options?: DeleteFileOptions;
+}
+
+export namespace DeleteFile {
+	export function create(uri: DocumentUri, options?: DeleteFileOptions, annotation?: ChangeAnnotationIdentifier): DeleteFile {
+		let result: DeleteFile = {
+			kind: 'delete',
+			uri
+		};
+		if (options !== undefined && (options.recursive !== undefined || options.ignoreIfNotExists !== undefined)) {
+			result.options = options;
+		}
+		if (annotation !== undefined) {
+			result.annotationId = annotation;
+		}
+		return result;
+	}
+
+	export function is(value: any): value is DeleteFile {
+		let candidate: DeleteFile = value;
+		return candidate && candidate.kind === 'delete' && Is.string(candidate.uri) && (
+			candidate.options === undefined ||
+			((candidate.options.recursive === undefined || Is.boolean(candidate.options.recursive)) && (candidate.options.ignoreIfNotExists === undefined || Is.boolean(candidate.options.ignoreIfNotExists)))
+		) && (
+			candidate.annotationId === undefined || ChangeAnnotationIdentifier.is(candidate.annotationId)
+		);
 	}
 }
 
@@ -675,20 +1168,45 @@ export interface WorkspaceEdit {
 	changes?: { [uri: string]: TextEdit[]; };
 
 	/**
-	 * An array of `TextDocumentEdit`s to express changes to n different text documents
-	 * where each text document edit addresses a specific version of a text document.
+	 * Depending on the client capability `workspace.workspaceEdit.resourceOperations` document changes
+	 * are either an array of `TextDocumentEdit`s to express changes to n different text documents
+	 * where each text document edit addresses a specific version of a text document. Or it can contain
+	 * above `TextDocumentEdit`s mixed with create, rename and delete file / folder operations.
+	 *
 	 * Whether a client supports versioned document edits is expressed via
-	 * `WorkspaceClientCapabilites.workspaceEdit.documentChanges`.
+	 * `workspace.workspaceEdit.documentChanges` client capability.
+	 *
+	 * If a client neither supports `documentChanges` nor `workspace.workspaceEdit.resourceOperations` then
+	 * only plain `TextEdit`s using the `changes` property are supported.
 	 */
-	documentChanges?: TextDocumentEdit[];
+	documentChanges?: (TextDocumentEdit | CreateFile | RenameFile | DeleteFile)[];
+
+
+	/**
+	 * A map of change annotations that can be referenced in `AnnotatedTextEdit`s or create, rename and
+	 * delete file / folder operations.
+	 *
+	 * Whether clients honor this property depends on the client capability `workspace.changeAnnotationSupport`.
+	 *
+	 * @since 3.16.0
+	 */
+	changeAnnotations?: {
+		[id: string /* ChangeAnnotationIdentifier */]: ChangeAnnotation;
+	}
 }
 
 export namespace WorkspaceEdit {
 	export function is(value: any): value is WorkspaceEdit {
 		let candidate: WorkspaceEdit = value;
 		return candidate &&
-			(candidate.changes !== void 0 || candidate.documentChanges !== void 0) &&
-			(candidate.documentChanges === void 0 || Is.typedArray(candidate.documentChanges, TextDocumentEdit.is));
+			(candidate.changes !== undefined || candidate.documentChanges !== undefined) &&
+			(candidate.documentChanges === undefined || candidate.documentChanges.every((change) => {
+				if (Is.string((change as ResourceOperation).kind)) {
+					return CreateFile.is(change) || RenameFile.is(change) || DeleteFile.is(change);
+				} else {
+					return TextDocumentEdit.is(change);
+				}
+			}));
 	}
 }
 
@@ -700,8 +1218,11 @@ export interface TextEditChange {
 	 * Gets all text edits for this change.
 	 *
 	 * @return An array of text edits.
+	 *
+	 * @since 3.16.0 - support for annotated text edits. This is usually
+	 * guarded using a client capability.
 	 */
-	all(): TextEdit[];
+	all(): (TextEdit | AnnotatedTextEdit)[];
 
 	/**
 	 * Clears the edits for this change.
@@ -710,64 +1231,183 @@ export interface TextEditChange {
 
 	/**
 	 * Adds a text edit.
+	 *
 	 * @param edit the text edit to add.
+	 *
+	 * @since 3.16.0 - support for annotated text edits. This is usually
+	 * guarded using a client capability.
 	 */
-	add(edit: TextEdit): void;
+	add(edit: TextEdit | AnnotatedTextEdit): void;
 
 	/**
 	 * Insert the given text at the given position.
 	 *
 	 * @param position A position.
 	 * @param newText A string.
+	 * @param annotation An optional annotation.
 	 */
 	insert(position: Position, newText: string): void;
+	insert(position: Position, newText: string, annotation: ChangeAnnotation | ChangeAnnotationIdentifier): ChangeAnnotationIdentifier;
 
 	/**
 	 * Replace the given range with given text for the given resource.
 	 *
 	 * @param range A range.
 	 * @param newText A string.
+	 * @param annotation An optional annotation.
 	 */
 	replace(range: Range, newText: string): void;
+	replace(range: Range, newText: string, annotation?: ChangeAnnotation | ChangeAnnotationIdentifier): ChangeAnnotationIdentifier;
 
 	/**
 	 * Delete the text at the given range.
 	 *
 	 * @param range A range.
+	 * @param annotation An optional annotation.
 	 */
 	delete(range: Range): void;
+	delete(range: Range, annotation?: ChangeAnnotation | ChangeAnnotationIdentifier): ChangeAnnotationIdentifier;
 }
 
 class TextEditChangeImpl implements TextEditChange {
 
-	private edits: TextEdit[];
+	private edits: (TextEdit | AnnotatedTextEdit)[];
+	private changeAnnotations: ChangeAnnotations | undefined;
 
-	public constructor(edits: TextEdit[]) {
+	public constructor(edits: (TextEdit | AnnotatedTextEdit)[], changeAnnotations?: ChangeAnnotations) {
 		this.edits = edits;
+		this.changeAnnotations = changeAnnotations;
 	}
 
-	public insert(position: Position, newText: string): void {
-		this.edits.push(TextEdit.insert(position, newText));
+	public insert(position: Position, newText: string): void
+	public insert(position: Position, newText: string, annotation: ChangeAnnotation | ChangeAnnotationIdentifier): ChangeAnnotationIdentifier;
+	public insert(position: Position, newText: string, annotation?: ChangeAnnotation | ChangeAnnotationIdentifier): ChangeAnnotationIdentifier | void {
+		let edit: TextEdit;
+		let id: ChangeAnnotationIdentifier | undefined;
+		if (annotation === undefined) {
+			edit = TextEdit.insert(position, newText);
+		} else if (ChangeAnnotationIdentifier.is(annotation)) {
+			id = annotation;
+			edit = AnnotatedTextEdit.insert(position, newText, annotation);
+		} else {
+			this.assertChangeAnnotations(this.changeAnnotations);
+			id = this.changeAnnotations.manage(annotation);
+			edit = AnnotatedTextEdit.insert(position, newText, id);
+		}
+		this.edits.push(edit);
+		if (id !== undefined) {
+			return id;
+		}
 	}
 
-	public replace(range: Range, newText: string): void {
-		this.edits.push(TextEdit.replace(range, newText));
+	public replace(range: Range, newText: string): void;
+	public replace(range: Range, newText: string, annotation: ChangeAnnotation | ChangeAnnotationIdentifier): ChangeAnnotationIdentifier;
+	public replace(range: Range, newText: string, annotation?: ChangeAnnotation | ChangeAnnotationIdentifier): ChangeAnnotationIdentifier | void {
+		let edit: TextEdit;
+		let id: ChangeAnnotationIdentifier | undefined;
+		if (annotation === undefined) {
+			edit = TextEdit.replace(range, newText);
+		} else if (ChangeAnnotationIdentifier.is(annotation)) {
+			id = annotation;
+			edit = AnnotatedTextEdit.replace(range, newText, annotation);
+		} else {
+			this.assertChangeAnnotations(this.changeAnnotations);
+			id = this.changeAnnotations.manage(annotation);
+			edit = AnnotatedTextEdit.replace(range, newText, id);
+		}
+		this.edits.push(edit);
+		if (id !== undefined) {
+			return id;
+		}
 	}
 
-	public delete(range: Range): void {
-		this.edits.push(TextEdit.del(range));
+	public delete(range: Range): void;
+	public delete(range: Range, annotation: ChangeAnnotation | ChangeAnnotationIdentifier): ChangeAnnotationIdentifier;
+	public delete(range: Range, annotation?: ChangeAnnotation | ChangeAnnotationIdentifier): ChangeAnnotationIdentifier | void {
+		let edit: TextEdit;
+		let id: ChangeAnnotationIdentifier | undefined;
+		if (annotation === undefined) {
+			edit = TextEdit.del(range);
+		} else if (ChangeAnnotationIdentifier.is(annotation)) {
+			id = annotation;
+			edit = AnnotatedTextEdit.del(range, annotation);
+		} else {
+			this.assertChangeAnnotations(this.changeAnnotations);
+			id = this.changeAnnotations.manage(annotation);
+			edit = AnnotatedTextEdit.del(range, id);
+		}
+		this.edits.push(edit);
+		if (id !== undefined) {
+			return id;
+		}
 	}
 
-	public add(edit: TextEdit): void {
+	public add(edit: TextEdit | AnnotatedTextEdit): void {
 		this.edits.push(edit);
 	}
 
-	public all(): TextEdit[] {
+	public all(): (TextEdit | AnnotatedTextEdit)[] {
 		return this.edits;
 	}
 
 	public clear(): void {
 		this.edits.splice(0, this.edits.length);
+	}
+
+	private assertChangeAnnotations(value: ChangeAnnotations | undefined): asserts value is ChangeAnnotations {
+		if (value === undefined) {
+			throw new Error(`Text edit change is not configured to manage change annotations.`);
+		}
+	}
+}
+
+/**
+ * A helper class
+ */
+class ChangeAnnotations {
+
+	private _annotations: { [id: string]: ChangeAnnotation };
+	private _counter: number;
+	private _size: number;
+
+	public constructor(annotations?: { [id: string]: ChangeAnnotation }) {
+		this._annotations = annotations === undefined ? Object.create(null) : annotations;
+		this._counter = 0;
+		this._size = 0;
+	}
+
+	public all(): { [id: string]: ChangeAnnotation } {
+		return this._annotations;
+	}
+
+	public get size(): number {
+		return this._size;
+	}
+
+	public manage(annotation: ChangeAnnotation): ChangeAnnotationIdentifier;
+	public manage(id: ChangeAnnotationIdentifier, annotation: ChangeAnnotation): ChangeAnnotationIdentifier;
+	public manage(idOrAnnotation: ChangeAnnotationIdentifier | ChangeAnnotation, annotation?: ChangeAnnotation): ChangeAnnotationIdentifier {
+		let id: ChangeAnnotationIdentifier;
+		if (ChangeAnnotationIdentifier.is(idOrAnnotation)) {
+			id = idOrAnnotation;
+		} else {
+			id = this.nextId();
+			annotation = idOrAnnotation;
+		}
+		if (this._annotations[id] !== undefined) {
+			throw new Error(`Id ${id} is already in use.`);
+		}
+		if (annotation === undefined) {
+			throw new Error(`No annotation provided for id ${id}`);
+		}
+		this._annotations[id] = annotation;
+		this._size++;
+		return id;
+	}
+
+	private nextId(): ChangeAnnotationIdentifier {
+		this._counter++;
+		return this._counter.toString();
 	}
 }
 
@@ -777,22 +1417,30 @@ class TextEditChangeImpl implements TextEditChange {
 export class WorkspaceChange {
 	private _workspaceEdit: WorkspaceEdit;
 	private _textEditChanges: { [uri: string]: TextEditChange };
+	private _changeAnnotations: ChangeAnnotations | undefined;
 
 	constructor(workspaceEdit?: WorkspaceEdit) {
 		this._textEditChanges = Object.create(null);
-		if (workspaceEdit) {
+		if (workspaceEdit !== undefined) {
 			this._workspaceEdit = workspaceEdit;
 			if (workspaceEdit.documentChanges) {
-				workspaceEdit.documentChanges.forEach((textDocumentEdit) => {
-					let textEditChange = new TextEditChangeImpl(textDocumentEdit.edits);
-					this._textEditChanges[textDocumentEdit.textDocument.uri] = textEditChange;
+				this._changeAnnotations = new ChangeAnnotations(workspaceEdit.changeAnnotations);
+				workspaceEdit.changeAnnotations = this._changeAnnotations.all();
+				workspaceEdit.documentChanges.forEach((change) => {
+					if (TextDocumentEdit.is(change)) {
+						const textEditChange = new TextEditChangeImpl(change.edits, this._changeAnnotations!);
+						this._textEditChanges[change.textDocument.uri] = textEditChange;
+					}
 				});
 			} else if (workspaceEdit.changes) {
 				Object.keys(workspaceEdit.changes).forEach((key) => {
-					let textEditChange = new TextEditChangeImpl(workspaceEdit.changes![key]);
+					const textEditChange = new TextEditChangeImpl(workspaceEdit.changes![key]);
 					this._textEditChanges[key] = textEditChange;
 				});
 			}
+		} else {
+			this._workspaceEdit = {
+			};
 		}
 	}
 
@@ -801,6 +1449,14 @@ export class WorkspaceChange {
 	 * use to be returned from a workspace edit operation like rename.
 	 */
 	public get edit(): WorkspaceEdit {
+		this.initDocumentChanges();
+		if (this._changeAnnotations !== undefined) {
+			if (this._changeAnnotations.size === 0) {
+				this._workspaceEdit.changeAnnotations = undefined;
+			} else {
+				this._workspaceEdit.changeAnnotations = this._changeAnnotations.all();
+			}
+		}
 		return this._workspaceEdit;
 	}
 
@@ -808,48 +1464,138 @@ export class WorkspaceChange {
 	 * Returns the [TextEditChange](#TextEditChange) to manage text edits
 	 * for resources.
 	 */
-	public getTextEditChange(textDocument: VersionedTextDocumentIdentifier): TextEditChange;
-	public getTextEditChange(uri: string): TextEditChange;
-	public getTextEditChange(key: string | VersionedTextDocumentIdentifier): TextEditChange {
-		if (VersionedTextDocumentIdentifier.is(key)) {
-			if (!this._workspaceEdit) {
-				this._workspaceEdit = {
-					documentChanges: []
-				};
+	public getTextEditChange(textDocument: OptionalVersionedTextDocumentIdentifier): TextEditChange;
+	public getTextEditChange(uri: DocumentUri): TextEditChange;
+	public getTextEditChange(key: DocumentUri | OptionalVersionedTextDocumentIdentifier): TextEditChange {
+		if (OptionalVersionedTextDocumentIdentifier.is(key)) {
+			this.initDocumentChanges();
+			if (this._workspaceEdit.documentChanges === undefined) {
+				throw new Error('Workspace edit is not configured for document changes.');
 			}
-			if (!this._workspaceEdit.documentChanges) {
-				throw new Error('Workspace edit is not configured for versioned document changes.');
-			}
-			let textDocument: VersionedTextDocumentIdentifier = key;
+			const textDocument: OptionalVersionedTextDocumentIdentifier = { uri: key.uri, version: key.version };
 			let result: TextEditChange = this._textEditChanges[textDocument.uri];
 			if (!result) {
-				let edits: TextEdit[] = [];
-				let textDocumentEdit: TextDocumentEdit = {
+				const edits: (TextEdit | AnnotatedTextEdit)[] = [];
+				const textDocumentEdit: TextDocumentEdit = {
 					textDocument,
 					edits
 				};
 				this._workspaceEdit.documentChanges.push(textDocumentEdit);
-				result = new TextEditChangeImpl(edits);
+				result = new TextEditChangeImpl(edits, this._changeAnnotations);
 				this._textEditChanges[textDocument.uri] = result;
 			}
 			return result;
 		} else {
-			if (!this._workspaceEdit) {
-				this._workspaceEdit = {
-					changes: Object.create(null)
-				}
-			}
-			if (!this._workspaceEdit.changes) {
+			this.initChanges();
+			if (this._workspaceEdit.changes === undefined) {
 				throw new Error('Workspace edit is not configured for normal text edit changes.');
 			}
 			let result: TextEditChange = this._textEditChanges[key];
 			if (!result) {
-				let edits: TextEdit[] = [];
+				let edits: (TextEdit | AnnotatedTextEdit)[] = [];
 				this._workspaceEdit.changes[key] = edits;
 				result = new TextEditChangeImpl(edits);
 				this._textEditChanges[key] = result;
 			}
 			return result;
+		}
+	}
+
+	private initDocumentChanges(): void {
+		if (this._workspaceEdit.documentChanges === undefined && this._workspaceEdit.changes === undefined) {
+			this._changeAnnotations = new ChangeAnnotations();
+			this._workspaceEdit.documentChanges = [];
+			this._workspaceEdit.changeAnnotations = this._changeAnnotations.all();
+		}
+	}
+
+	private initChanges(): void {
+		if (this._workspaceEdit.documentChanges === undefined && this._workspaceEdit.changes === undefined) {
+			this._workspaceEdit.changes = Object.create(null);
+		}
+	}
+
+	public createFile(uri: DocumentUri, options?: CreateFileOptions): void;
+	public createFile(uri: DocumentUri, annotation: ChangeAnnotation | ChangeAnnotationIdentifier, options?: CreateFileOptions): ChangeAnnotationIdentifier;
+	public createFile(uri: DocumentUri, optionsOrAnnotation?: CreateFileOptions | ChangeAnnotation | ChangeAnnotationIdentifier, options?: CreateFileOptions): ChangeAnnotationIdentifier | void {
+		this.initDocumentChanges();
+		if (this._workspaceEdit.documentChanges === undefined) {
+			throw new Error('Workspace edit is not configured for document changes.');
+		}
+		let annotation: ChangeAnnotation | ChangeAnnotationIdentifier | undefined;
+		if (ChangeAnnotation.is(optionsOrAnnotation) || ChangeAnnotationIdentifier.is(optionsOrAnnotation)) {
+			annotation = optionsOrAnnotation;
+		} else {
+			options = optionsOrAnnotation;
+		}
+
+		let operation: CreateFile;
+		let id: ChangeAnnotationIdentifier | undefined;
+		if (annotation === undefined) {
+			operation = CreateFile.create(uri, options);
+		} else {
+			id = ChangeAnnotationIdentifier.is(annotation) ? annotation : this._changeAnnotations!.manage(annotation);
+			operation = CreateFile.create(uri, options, id);
+		}
+		this._workspaceEdit.documentChanges.push(operation);
+		if (id !== undefined) {
+			return id;
+		}
+	}
+
+	public renameFile(oldUri: DocumentUri, newUri: DocumentUri, options?: RenameFileOptions): void;
+	public renameFile(oldUri: DocumentUri, newUri: DocumentUri, annotation?: ChangeAnnotation | ChangeAnnotationIdentifier, options?: RenameFileOptions): ChangeAnnotationIdentifier;
+	public renameFile(oldUri: DocumentUri, newUri: DocumentUri, optionsOrAnnotation?: RenameFileOptions | ChangeAnnotation | ChangeAnnotationIdentifier, options?: RenameFileOptions): ChangeAnnotationIdentifier | void {
+		this.initDocumentChanges();
+		if (this._workspaceEdit.documentChanges === undefined) {
+			throw new Error('Workspace edit is not configured for document changes.');
+		}
+		let annotation: ChangeAnnotation | ChangeAnnotationIdentifier | undefined;
+		if (ChangeAnnotation.is(optionsOrAnnotation) || ChangeAnnotationIdentifier.is(optionsOrAnnotation)) {
+			annotation = optionsOrAnnotation;
+		} else {
+			options = optionsOrAnnotation;
+		}
+
+		let operation: RenameFile;
+		let id: ChangeAnnotationIdentifier | undefined;
+		if (annotation === undefined) {
+			operation = RenameFile.create(oldUri, newUri, options);
+		} else {
+			id = ChangeAnnotationIdentifier.is(annotation) ? annotation : this._changeAnnotations!.manage(annotation);
+			operation = RenameFile.create(oldUri, newUri, options, id);
+		}
+		this._workspaceEdit.documentChanges.push(operation);
+		if (id !== undefined) {
+			return id;
+		}
+	}
+
+	public deleteFile(uri: DocumentUri, options?: DeleteFileOptions): void;
+	public deleteFile(uri: DocumentUri, annotation: ChangeAnnotation | ChangeAnnotationIdentifier, options?: DeleteFileOptions): ChangeAnnotationIdentifier;
+	public deleteFile(uri: DocumentUri, optionsOrAnnotation?: DeleteFileOptions | ChangeAnnotation | ChangeAnnotationIdentifier, options?: DeleteFileOptions): ChangeAnnotationIdentifier | void {
+		this.initDocumentChanges();
+		if (this._workspaceEdit.documentChanges === undefined) {
+			throw new Error('Workspace edit is not configured for document changes.');
+		}
+		let annotation: ChangeAnnotation | ChangeAnnotationIdentifier | undefined;
+		if (ChangeAnnotation.is(optionsOrAnnotation) || ChangeAnnotationIdentifier.is(optionsOrAnnotation)) {
+			annotation = optionsOrAnnotation;
+		} else {
+			options = optionsOrAnnotation;
+		}
+
+		let operation: DeleteFile;
+		let id: ChangeAnnotationIdentifier | undefined;
+		if (annotation === undefined) {
+			operation = DeleteFile.create(uri, options);
+		} else {
+			id = ChangeAnnotationIdentifier.is(annotation) ? annotation : this._changeAnnotations!.manage(annotation);
+			operation = DeleteFile.create(uri, options, id);
+		}
+		this._workspaceEdit.documentChanges.push(operation);
+		if (id !== undefined) {
+			return id;
 		}
 	}
 }
@@ -861,7 +1607,7 @@ export interface TextDocumentIdentifier {
 	/**
 	 * The text document's uri.
 	 */
-	uri: string;
+	uri: DocumentUri;
 }
 
 /**
@@ -873,7 +1619,7 @@ export namespace TextDocumentIdentifier {
 	 * Creates a new TextDocumentIdentifier literal.
 	 * @param uri The document's uri.
 	 */
-	export function create(uri: string): TextDocumentIdentifier {
+	export function create(uri: DocumentUri): TextDocumentIdentifier {
 		return { uri };
 	}
 	/**
@@ -886,17 +1632,13 @@ export namespace TextDocumentIdentifier {
 }
 
 /**
- * An identifier to denote a specific version of a text document.
+ * A text document identifier to denote a specific version of a text document.
  */
 export interface VersionedTextDocumentIdentifier extends TextDocumentIdentifier {
 	/**
-	 * The version number of this document. If a versioned text document identifier
-	 * is sent from the server to the client and the file is not open in the editor
-	 * (the server has not received an open notification before) the server can send
-	 * `null` to indicate that the version is unknown and the content on disk is the
-	 * truth (as speced with document content ownership).
+	 * The version number of this document.
 	 */
-	version: number | null;
+	version: integer;
 }
 
 /**
@@ -909,7 +1651,7 @@ export namespace VersionedTextDocumentIdentifier {
 	 * @param uri The document's uri.
 	 * @param uri The document's text.
 	 */
-	export function create(uri: string, version: number): VersionedTextDocumentIdentifier {
+	export function create(uri: DocumentUri, version: integer): VersionedTextDocumentIdentifier {
 		return { uri, version };
 	}
 
@@ -918,10 +1660,46 @@ export namespace VersionedTextDocumentIdentifier {
 	 */
 	export function is(value: any): value is VersionedTextDocumentIdentifier {
 		let candidate = value as VersionedTextDocumentIdentifier;
-		return Is.defined(candidate) && Is.string(candidate.uri) && Is.number(candidate.version);
+		return Is.defined(candidate) && Is.string(candidate.uri) && Is.integer(candidate.version);
 	}
 }
 
+/**
+ * A text document identifier to optionally denote a specific version of a text document.
+ */
+export interface OptionalVersionedTextDocumentIdentifier extends TextDocumentIdentifier {
+	/**
+	 * The version number of this document. If a versioned text document identifier
+	 * is sent from the server to the client and the file is not open in the editor
+	 * (the server has not received an open notification before) the server can send
+	 * `null` to indicate that the version is unknown and the content on disk is the
+	 * truth (as specified with document content ownership).
+	 */
+	version: integer | null;
+}
+
+/**
+ * The OptionalVersionedTextDocumentIdentifier namespace provides helper functions to work with
+ * [OptionalVersionedTextDocumentIdentifier](#OptionalVersionedTextDocumentIdentifier) literals.
+ */
+export namespace OptionalVersionedTextDocumentIdentifier {
+	/**
+	 * Creates a new OptionalVersionedTextDocumentIdentifier literal.
+	 * @param uri The document's uri.
+	 * @param uri The document's text.
+	 */
+	export function create(uri: DocumentUri, version: integer | null): OptionalVersionedTextDocumentIdentifier {
+		return { uri, version };
+	}
+
+	/**
+	 * Checks whether the given literal conforms to the [OptionalVersionedTextDocumentIdentifier](#OptionalVersionedTextDocumentIdentifier) interface.
+	 */
+	export function is(value: any): value is OptionalVersionedTextDocumentIdentifier {
+		let candidate = value as OptionalVersionedTextDocumentIdentifier;
+		return Is.defined(candidate) && Is.string(candidate.uri) && (candidate.version === null || Is.integer(candidate.version));
+	}
+}
 
 /**
  * An item to transfer a text document from the client to the
@@ -931,7 +1709,7 @@ export interface TextDocumentItem {
 	/**
 	 * The text document's uri.
 	 */
-	uri: string;
+	uri: DocumentUri;
 
 	/**
 	 * The text document's language identifier
@@ -942,7 +1720,7 @@ export interface TextDocumentItem {
 	 * The version number of this document (it will increase after each
 	 * change, including undo/redo).
 	 */
-	version: number;
+	version: integer;
 
 	/**
 	 * The content of the opened text document.
@@ -962,7 +1740,7 @@ export namespace TextDocumentItem {
 	 * @param version The document's version number.
 	 * @param text The document's text.
 	 */
-	export function create(uri: string, languageId: string, version: number, text: string): TextDocumentItem {
+	export function create(uri: DocumentUri, languageId: string, version: integer, text: string): TextDocumentItem {
 		return { uri, languageId, version, text };
 	}
 
@@ -971,7 +1749,7 @@ export namespace TextDocumentItem {
 	 */
 	export function is(value: any): value is TextDocumentItem {
 		let candidate = value as TextDocumentItem;
-		return Is.defined(candidate) && Is.string(candidate.uri) && Is.string(candidate.languageId) && Is.number(candidate.version) && Is.string(candidate.text);
+		return Is.defined(candidate) && Is.string(candidate.uri) && Is.string(candidate.languageId) && Is.integer(candidate.version) && Is.string(candidate.text);
 	}
 }
 
@@ -1103,12 +1881,103 @@ export namespace InsertTextFormat {
 	 * the end of the snippet. Placeholders with equal identifiers are linked,
 	 * that is typing in one will update others too.
 	 *
-	 * See also: https://github.com/Microsoft/vscode/blob/master/src/vs/editor/contrib/snippet/common/snippet.md
+	 * See also: https://microsoft.github.io/language-server-protocol/specifications/specification-current/#snippet_syntax
 	 */
 	export const Snippet: 2 = 2;
 }
 
 export type InsertTextFormat = 1 | 2;
+
+
+/**
+ * Completion item tags are extra annotations that tweak the rendering of a completion
+ * item.
+ *
+ * @since 3.15.0
+ */
+export namespace CompletionItemTag {
+	/**
+	 * Render a completion as obsolete, usually using a strike-out.
+	 */
+	export const Deprecated = 1;
+}
+
+export type CompletionItemTag = 1;
+
+/**
+ * A special text edit to provide an insert and a replace operation.
+ *
+ * @since 3.16.0
+ */
+export interface InsertReplaceEdit {
+	/**
+	 * The string to be inserted.
+	 */
+	newText: string;
+
+	/**
+	 * The range if the insert is requested
+	 */
+	insert: Range;
+
+	/**
+	 * The range if the replace is requested.
+	 */
+	replace: Range;
+}
+
+/**
+ * The InsertReplaceEdit namespace provides functions to deal with insert / replace edits.
+ *
+ * @since 3.16.0
+ */
+export namespace InsertReplaceEdit {
+
+	/**
+	 * Creates a new insert / replace edit
+	 */
+	export function create(newText: string, insert: Range, replace: Range): InsertReplaceEdit {
+		return { newText, insert, replace };
+	}
+
+	/**
+	 * Checks whether the given literal conforms to the [InsertReplaceEdit](#InsertReplaceEdit) interface.
+	 */
+	export function is(value: TextEdit | InsertReplaceEdit): value is InsertReplaceEdit {
+		const candidate: InsertReplaceEdit = value as InsertReplaceEdit;
+		return candidate && Is.string(candidate.newText) && Range.is(candidate.insert) && Range.is(candidate.replace);
+	}
+}
+
+/**
+ * How whitespace and indentation is handled during completion
+ * item insertion.
+ *
+ * @since 3.16.0
+ */
+export namespace InsertTextMode {
+	/**
+	 * The insertion or replace strings is taken as it is. If the
+	 * value is multi line the lines below the cursor will be
+	 * inserted using the indentation defined in the string value.
+	 * The client will not apply any kind of adjustments to the
+	 * string.
+	 */
+	export const asIs: 1 = 1;
+
+	/**
+	 * The editor adjusts leading whitespace of new lines so that
+	 * they match the indentation up to the cursor of the line for
+	 * which the item is accepted.
+	 *
+	 * Consider a line like this: <2tabs><cursor><3tabs>foo. Accepting a
+	 * multi line completion item is indented using 2 tabs and all
+	 * following lines inserted will be indented using 2 tabs as well.
+	 */
+	export const adjustIndentation: 2 = 2;
+}
+
+export type InsertTextMode = 1 | 2;
 
 /**
  * A completion item represents a text snippet that is
@@ -1130,6 +1999,13 @@ export interface CompletionItem {
 	kind?: CompletionItemKind;
 
 	/**
+	 * Tags for this completion item.
+	 *
+	 * @since 3.15.0
+	 */
+	tags?: CompletionItemTag[];
+
+	/**
 	 * A human-readable string with additional information
 	 * about this item, like type or symbol information.
 	 */
@@ -1142,6 +2018,7 @@ export interface CompletionItem {
 
 	/**
 	 * Indicates if this item is deprecated.
+	 * @deprecated Use `tags` instead.
 	 */
 	deprecated?: boolean;
 
@@ -1179,26 +2056,44 @@ export interface CompletionItem {
 	 * and a completion item with an `insertText` of `console` is provided it
 	 * will only insert `sole`. Therefore it is recommended to use `textEdit` instead
 	 * since it avoids additional client side interpretation.
-	 *
-	 * @deprecated Use textEdit instead.
 	 */
 	insertText?: string;
 
 	/**
 	 * The format of the insert text. The format applies to both the `insertText` property
-	 * and the `newText` property of a provided `textEdit`.
+	 * and the `newText` property of a provided `textEdit`. If omitted defaults to
+	 * `InsertTextFormat.PlainText`.
 	 */
 	insertTextFormat?: InsertTextFormat;
+
+	/**
+	 * How whitespace and indentation is handled during completion
+	 * item insertion. If ignored the clients default value depends on
+	 * the `textDocument.completion.insertTextMode` client capability.
+	 *
+	 * @since 3.16.0
+	 */
+	insertTextMode?: InsertTextMode;
 
 	/**
 	 * An [edit](#TextEdit) which is applied to a document when selecting
 	 * this completion. When an edit is provided the value of
 	 * [insertText](#CompletionItem.insertText) is ignored.
 	 *
-	 * *Note:* The text edit's range must be a [single line] and it must contain the position
-	 * at which completion has been requested.
+	 * Most editors support two different operation when accepting a completion item. One is to insert a
+	 * completion text and the other is to replace an existing text with a completion text. Since this can
+	 * usually not predetermined by a server it can report both ranges. Clients need to signal support for
+	 * `InsertReplaceEdits` via the `textDocument.completion.insertReplaceSupport` client capability
+	 * property.
+	 *
+	 * *Note 1:* The text edit's range as well as both ranges from a insert replace edit must be a
+	 * [single line] and they must contain the position at which completion has been requested.
+	 * *Note 2:* If an `InsertReplaceEdit` is returned the edit's insert range must be a prefix of
+	 * the edit's replace range, that means it must be contained and starting at the same position.
+	 *
+	 * @since 3.16.0 additional type `InsertReplaceEdit`
 	 */
-	textEdit?: TextEdit;
+	textEdit?: TextEdit | InsertReplaceEdit;
 
 	/**
 	 * An optional array of additional [text edits](#TextEdit) that are applied when
@@ -1226,7 +2121,7 @@ export interface CompletionItem {
 	command?: Command;
 
 	/**
-	 * An data entry field that is preserved on a completion item between
+	 * A data entry field that is preserved on a completion item between
 	 * a [CompletionRequest](#CompletionRequest) and a [CompletionResolveRequest]
 	 * (#CompletionResolveRequest)
 	 */
@@ -1302,7 +2197,7 @@ export namespace MarkedString {
 	 * @param plainText The plain text.
 	 */
 	export function fromPlainText(plainText: string): string {
-		return plainText.replace(/[\\`*_{}[\]()#+\-.!]/g, "\\$&"); // escape markdown syntax tokens: http://daringfireball.net/projects/markdown/syntax#backslash
+		return plainText.replace(/[\\`*_{}[\]()#+\-.!]/g, '\\$&'); // escape markdown syntax tokens: http://daringfireball.net/projects/markdown/syntax#backslash
 	}
 
 	/**
@@ -1335,13 +2230,13 @@ export namespace Hover {
 	 */
 	export function is(value: any): value is Hover {
 		let candidate = value as Hover;
-		return Is.objectLiteral(candidate) && (
+		return !!candidate && Is.objectLiteral(candidate) && (
 			MarkupContent.is(candidate.contents) ||
 			MarkedString.is(candidate.contents) ||
 			Is.typedArray(candidate.contents, MarkedString.is)
 		) && (
-				value.range === void 0 || Range.is(value.range)
-			);
+			value.range === undefined || Range.is(value.range)
+		);
 	}
 }
 
@@ -1350,11 +2245,18 @@ export namespace Hover {
  * have a label and a doc-comment.
  */
 export interface ParameterInformation {
+
 	/**
-	 * The label of this signature. Will be shown in
-	 * the UI.
+	 * The label of this parameter information.
+	 *
+	 * Either a string or an inclusive start and exclusive end offsets within its containing
+	 * signature label. (see SignatureInformation.label). The offsets are based on a UTF-16
+	 * string representation as `Position` and `Range` does.
+	 *
+	 * *Note*: a label of type string should be a substring of its containing signature label.
+	 * Its intended use case is to highlight the parameter label part in the `SignatureInformation.label`.
 	 */
-	label: string;
+	label: string | [uinteger, uinteger];
 
 	/**
 	 * The human-readable doc-comment of this signature. Will be shown
@@ -1374,9 +2276,9 @@ export namespace ParameterInformation {
 	 * @param label A label string.
 	 * @param documentation A doc string.
 	 */
-	export function create(label: string, documentation?: string): ParameterInformation {
+	export function create(label: string | [uinteger, uinteger], documentation?: string): ParameterInformation {
 		return documentation ? { label, documentation } : { label };
-	};
+	}
 }
 
 /**
@@ -1401,6 +2303,15 @@ export interface SignatureInformation {
 	 * The parameters of this signature.
 	 */
 	parameters?: ParameterInformation[];
+
+	/**
+	 * The index of the active parameter.
+	 *
+	 * If provided, this is used in place of `SignatureHelp.activeParameter`.
+	 *
+	 * @since 3.16.0
+	 */
+	activeParameter?: uinteger;
 }
 
 /**
@@ -1437,21 +2348,48 @@ export interface SignatureHelp {
 	 * The active signature. Set to `null` if no
 	 * signatures exist.
 	 */
-	activeSignature: number | null;
+	activeSignature: uinteger | null;
 
 	/**
 	 * The active parameter of the active signature. Set to `null`
 	 * if the active signature has no parameters.
 	 */
-	activeParameter: number | null;
+	activeParameter: uinteger | null;
 }
 
 /**
  * The definition of a symbol represented as one or many [locations](#Location).
  * For most programming languages there is only one location at which a symbol is
- * defined. If no definition can be found `null` is returned.
+ * defined.
+ *
+ * Servers should prefer returning `DefinitionLink` over `Definition` if supported
+ * by the client.
  */
-export type Definition = Location | Location[] | null;
+export type Definition = Location | Location[];
+
+/**
+ * Information about where a symbol is defined.
+ *
+ * Provides additional metadata over normal [location](#Location) definitions, including the range of
+ * the defining symbol
+ */
+export type DefinitionLink = LocationLink;
+
+/**
+ * The declaration of a symbol representation as one or many [locations](#Location).
+ */
+export type Declaration = Location | Location[];
+
+/**
+ * Information about where a symbol is declared.
+ *
+ * Provides additional metadata over normal [location](#Location) declarations, including the range of
+ * the declaring symbol.
+ *
+ * Servers should prefer returning `DeclarationLink` over `Declaration` if supported
+ * by the client.
+ */
+export type DeclarationLink = LocationLink;
 
 /**
  * Value-object that contains additional information when
@@ -1556,6 +2494,21 @@ export namespace SymbolKind {
 export type SymbolKind = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26;
 
 /**
+ * Symbol tags are extra annotations that tweak the rendering of a symbol.
+ * @since 3.16
+ */
+export namespace SymbolTag {
+
+	/**
+	 * Render a symbol as obsolete, usually using a strike-out.
+	 */
+	export const Deprecated: 1 = 1;
+}
+
+export type SymbolTag = 1;
+
+
+/**
  * Represents information about programming constructs like variables, classes,
  * interfaces etc.
  */
@@ -1571,7 +2524,16 @@ export interface SymbolInformation {
 	kind: SymbolKind;
 
 	/**
+	 * Tags for this completion item.
+	 *
+	 * @since 3.16.0
+	 */
+	tags?: SymbolTag[];
+
+	/**
 	 * Indicates if this symbol is deprecated.
+	 *
+	 * @deprecated Use tags instead
 	 */
 	deprecated?: boolean;
 
@@ -1612,7 +2574,7 @@ export namespace SymbolInformation {
 			name,
 			kind,
 			location: { uri: uri as any, range }
-		}
+		};
 		if (containerName) {
 			result.containerName = containerName;
 		}
@@ -1626,10 +2588,11 @@ export namespace SymbolInformation {
  * have two ranges: one that encloses its definition and one that points to
  * its most interesting range, e.g. the range of an identifier.
  */
-export class DocumentSymbol {
+export interface DocumentSymbol {
 
 	/**
-	 * The name of this symbol.
+	 * The name of this symbol. Will be displayed in the user interface and therefore must not be
+	 * an empty string or a string only consisting of white spaces.
 	 */
 	name: string;
 
@@ -1644,7 +2607,16 @@ export class DocumentSymbol {
 	kind: SymbolKind;
 
 	/**
+	 * Tags for this completion item.
+	 *
+	 * @since 3.16.0
+	 */
+	tags?: SymbolTag[];
+
+	/**
 	 * Indicates if this symbol is deprecated.
+	 *
+	 * @deprecated Use tags instead
 	 */
 	deprecated?: boolean;
 
@@ -1686,7 +2658,7 @@ export namespace DocumentSymbol {
 			range,
 			selectionRange
 		};
-		if (children !== void 0) {
+		if (children !== undefined) {
 			result.children = children;
 		}
 		return result;
@@ -1699,30 +2671,11 @@ export namespace DocumentSymbol {
 		return candidate &&
 			Is.string(candidate.name) && Is.number(candidate.kind) &&
 			Range.is(candidate.range) && Range.is(candidate.selectionRange) &&
-			(candidate.detail === void 0 || Is.string(candidate.detail)) &&
-			(candidate.deprecated === void 0 || Is.boolean(candidate.deprecated)) &&
-			(candidate.children === void 0 || Array.isArray(candidate.children));
+			(candidate.detail === undefined || Is.string(candidate.detail)) &&
+			(candidate.deprecated === undefined || Is.boolean(candidate.deprecated)) &&
+			(candidate.children === undefined || Array.isArray(candidate.children)) &&
+			(candidate.tags === undefined || Array.isArray(candidate.tags));
 	}
-}
-
-/**
- * Parameters for a [DocumentSymbolRequest](#DocumentSymbolRequest).
- */
-export interface DocumentSymbolParams {
-	/**
-	 * The text document.
-	 */
-	textDocument: TextDocumentIdentifier;
-}
-
-/**
- * The parameters of a [WorkspaceSymbolRequest](#WorkspaceSymbolRequest).
- */
-export interface WorkspaceSymbolParams {
-	/**
-	 * A non-empty query string
-	 */
-	query: string;
 }
 
 /**
@@ -1739,6 +2692,12 @@ export type CodeActionKind = string;
  * A set of predefined code action kinds
  */
 export namespace CodeActionKind {
+
+	/**
+	 * Empty kind.
+	 */
+	export const Empty: CodeActionKind = '';
+
 	/**
 	 * Base kind for quickfix actions: 'quickfix'
 	 */
@@ -1799,6 +2758,16 @@ export namespace CodeActionKind {
 	 * Base kind for an organize imports source action: `source.organizeImports`
 	 */
 	export const SourceOrganizeImports: CodeActionKind = 'source.organizeImports';
+
+	/**
+	 * Base kind for auto-fix source actions: `source.fixAll`.
+	 *
+	 * Fix all actions automatically fix errors that have a clear fix that do not require user input.
+	 * They should not suppress errors or perform unsafe fixes such as generating new types or classes.
+	 *
+	 * @since 3.15.0
+	 */
+	export const SourceFixAll: CodeActionKind = 'source.fixAll';
 }
 
 
@@ -1808,7 +2777,11 @@ export namespace CodeActionKind {
  */
 export interface CodeActionContext {
 	/**
-	 * An array of diagnostics.
+	 * An array of diagnostics known on the client side overlapping the range provided to the
+	 * `textDocument/codeAction` request. They are provided so that the server knows which
+	 * errors are currently presented to the user for the given range. There is no guarantee
+	 * that these accurately reflect the error state of the resource. The primary parameter
+	 * to compute code actions is the provided range.
 	 */
 	diagnostics: Diagnostic[];
 
@@ -1831,7 +2804,7 @@ export namespace CodeActionContext {
 	 */
 	export function create(diagnostics: Diagnostic[], only?: CodeActionKind[]): CodeActionContext {
 		let result: CodeActionContext = { diagnostics };
-		if (only !== void 0 && only !== null) {
+		if (only !== undefined && only !== null) {
 			result.only = only;
 		}
 		return result;
@@ -1841,7 +2814,7 @@ export namespace CodeActionContext {
 	 */
 	export function is(value: any): value is CodeActionContext {
 		let candidate = value as CodeActionContext;
-		return Is.defined(candidate) && Is.typedArray<Diagnostic[]>(candidate.diagnostics, Diagnostic.is) && (candidate.only === void 0 || Is.typedArray(candidate.only, Is.string));
+		return Is.defined(candidate) && Is.typedArray<Diagnostic[]>(candidate.diagnostics, Diagnostic.is) && (candidate.only === undefined || Is.typedArray(candidate.only, Is.string));
 	}
 }
 
@@ -1871,6 +2844,44 @@ export interface CodeAction {
 	diagnostics?: Diagnostic[];
 
 	/**
+	 * Marks this as a preferred action. Preferred actions are used by the `auto fix` command and can be targeted
+	 * by keybindings.
+	 *
+	 * A quick fix should be marked preferred if it properly addresses the underlying error.
+	 * A refactoring should be marked preferred if it is the most reasonable choice of actions to take.
+	 *
+	 * @since 3.15.0
+	 */
+	isPreferred?: boolean;
+
+	/**
+	 * Marks that the code action cannot currently be applied.
+	 *
+	 * Clients should follow the following guidelines regarding disabled code actions:
+	 *
+	 *   - Disabled code actions are not shown in automatic [lightbulb](https://code.visualstudio.com/docs/editor/editingevolved#_code-action)
+	 *     code action menu.
+	 *
+	 *   - Disabled actions are shown as faded out in the code action menu when the user request a more specific type
+	 *     of code action, such as refactorings.
+	 *
+	 *   - If the user has a [keybinding](https://code.visualstudio.com/docs/editor/refactoring#_keybindings-for-code-actions)
+	 *     that auto applies a code action and only a disabled code actions are returned, the client should show the user an
+	 *     error message with `reason` in the editor.
+	 *
+	 * @since 3.16.0
+	 */
+	disabled?: {
+
+		/**
+		 * Human readable description of why the code action is currently disabled.
+		 *
+		 * This is displayed in the code actions UI.
+		 */
+		reason: string;
+	};
+
+	/**
 	 * The workspace edit this code action performs.
 	 */
 	edit?: WorkspaceEdit;
@@ -1881,9 +2892,25 @@ export interface CodeAction {
 	 * executed and then the command.
 	 */
 	command?: Command;
+
+	/**
+	 * A data entry field that is preserved on a code action between
+	 * a `textDocument/codeAction` and a `codeAction/resolve` request.
+	 *
+	 * @since 3.16.0
+	 */
+	data?: unknown;
 }
 
 export namespace CodeAction {
+	/**
+	 * Creates a new code action.
+	 *
+	 * @param title The title of the code action.
+	 * @param kind The kind of the code action.
+	 */
+	export function create(title: string, kind?: CodeActionKind): CodeAction;
+
 	/**
 	 * Creates a new code action.
 	 *
@@ -1892,6 +2919,7 @@ export namespace CodeAction {
 	 * @param kind The kind of the code action.
 	 */
 	export function create(title: string, command: Command, kind?: CodeActionKind): CodeAction;
+
 	/**
 	 * Creates a new code action.
 	 *
@@ -1900,14 +2928,19 @@ export namespace CodeAction {
 	 * @param kind The kind of the code action.
 	 */
 	export function create(title: string, edit: WorkspaceEdit, kind?: CodeActionKind): CodeAction;
-	export function create(title: string, commandOrEdit: Command | WorkspaceEdit, kind?: CodeActionKind): CodeAction {
+
+	export function create(title: string, kindOrCommandOrEdit?: CodeActionKind | Command | WorkspaceEdit, kind?: CodeActionKind): CodeAction {
 		let result: CodeAction = { title };
-		if (Command.is(commandOrEdit)) {
-			result.command = commandOrEdit;
+		let checkKind: boolean = true;
+		if (typeof kindOrCommandOrEdit === 'string') {
+			checkKind = false;
+			result.kind = kindOrCommandOrEdit;
+		} else if (Command.is(kindOrCommandOrEdit)) {
+			result.command = kindOrCommandOrEdit;
 		} else {
-			result.edit = commandOrEdit;
+			result.edit = kindOrCommandOrEdit;
 		}
-		if (kind !== void null) {
+		if (checkKind && kind !== undefined) {
 			result.kind = kind;
 		}
 		return result;
@@ -1915,11 +2948,12 @@ export namespace CodeAction {
 	export function is(value: any): value is CodeAction {
 		let candidate: CodeAction = value;
 		return candidate && Is.string(candidate.title) &&
-			(candidate.diagnostics === void 0 || Is.typedArray(candidate.diagnostics, Diagnostic.is)) &&
-			(candidate.kind === void 0 || Is.string(candidate.kind)) &&
-			(candidate.edit !== void 0 || candidate.command !== void 0) &&
-			(candidate.command === void 0 || Command.is(candidate.command)) &&
-			(candidate.edit === void 0 || WorkspaceEdit.is(candidate.edit));
+			(candidate.diagnostics === undefined || Is.typedArray(candidate.diagnostics, Diagnostic.is)) &&
+			(candidate.kind === undefined || Is.string(candidate.kind)) &&
+			(candidate.edit !== undefined || candidate.command !== undefined) &&
+			(candidate.command === undefined || Command.is(candidate.command)) &&
+			(candidate.isPreferred === undefined || Is.boolean(candidate.isPreferred)) &&
+			(candidate.edit === undefined || WorkspaceEdit.is(candidate.edit));
 	}
 }
 
@@ -1942,7 +2976,7 @@ export interface CodeLens {
 	command?: Command;
 
 	/**
-	 * An data entry field that is preserved on a code lens item between
+	 * A data entry field that is preserved on a code lens item between
 	 * a [CodeLensRequest](#CodeLensRequest) and a [CodeLensResolveRequest]
 	 * (#CodeLensResolveRequest)
 	 */
@@ -1959,7 +2993,7 @@ export namespace CodeLens {
 	 */
 	export function create(range: Range, data?: any): CodeLens {
 		let result: CodeLens = { range };
-		if (Is.defined(data)) result.data = data;
+		if (Is.defined(data)) { result.data = data; }
 		return result;
 	}
 	/**
@@ -1978,7 +3012,7 @@ export interface FormattingOptions {
 	/**
 	 * Size of a tab in spaces.
 	 */
-	tabSize: number;
+	tabSize: uinteger;
 
 	/**
 	 * Prefer spaces over tabs.
@@ -1986,9 +3020,30 @@ export interface FormattingOptions {
 	insertSpaces: boolean;
 
 	/**
+	 * Trim trailing whitespaces on a line.
+	 *
+	 * @since 3.15.0
+	 */
+	trimTrailingWhitespace?: boolean;
+
+	/**
+	 * Insert a newline character at the end of the file if one does not exist.
+	 *
+	 * @since 3.15.0
+	 */
+	insertFinalNewline?: boolean;
+
+	/**
+	 * Trim all newlines after the final newline at the end of the file.
+	 *
+	 * @since 3.15.0
+	 */
+	trimFinalNewlines?: boolean;
+
+	/**
 	 * Signature for further properties.
 	 */
-	[key: string]: boolean | number | string;
+	[key: string]: boolean | integer | string | undefined;
 }
 
 /**
@@ -1999,7 +3054,7 @@ export namespace FormattingOptions {
 	/**
 	 * Creates a new FormattingOptions literal.
 	 */
-	export function create(tabSize: number, insertSpaces: boolean): FormattingOptions {
+	export function create(tabSize: uinteger, insertSpaces: boolean): FormattingOptions {
 		return { tabSize, insertSpaces };
 	}
 	/**
@@ -2007,7 +3062,7 @@ export namespace FormattingOptions {
 	 */
 	export function is(value: any): value is FormattingOptions {
 		let candidate = value as FormattingOptions;
-		return Is.defined(candidate) && Is.number(candidate.tabSize) && Is.boolean(candidate.insertSpaces);
+		return Is.defined(candidate) && Is.uinteger(candidate.tabSize) && Is.boolean(candidate.insertSpaces);
 	}
 }
 
@@ -2015,7 +3070,7 @@ export namespace FormattingOptions {
  * A document link is a range in a text document that links to an internal or external resource, like another
  * text document or a web site.
  */
-export class DocumentLink {
+export interface DocumentLink {
 
 	/**
 	 * The range this link applies to.
@@ -2026,6 +3081,17 @@ export class DocumentLink {
 	 * The uri this link points to.
 	 */
 	target?: string;
+
+	/**
+	 * The tooltip text when you hover over this link.
+	 *
+	 * If a tooltip is provided, is will be displayed in a string that includes instructions on how to
+	 * trigger the link, such as `{0} (ctrl + click)`. The specific instructions vary depending on OS,
+	 * user settings, and localization.
+	 *
+	 * @since 3.15.0
+	 */
+	tooltip?: string;
 
 	/**
 	 * A data entry field that is preserved on a document link between a
@@ -2055,10 +3121,140 @@ export namespace DocumentLink {
 	}
 }
 
+/**
+ * A selection range represents a part of a selection hierarchy. A selection range
+ * may have a parent selection range that contains it.
+ */
+export interface SelectionRange {
+
+	/**
+	 * The [range](#Range) of this selection range.
+	 */
+	range: Range;
+
+	/**
+	 * The parent selection range containing this range. Therefore `parent.range` must contain `this.range`.
+	 */
+	parent?: SelectionRange;
+
+}
+
+/**
+ * The SelectionRange namespace provides helper function to work with
+ * SelectionRange literals.
+ */
+export namespace SelectionRange {
+	/**
+	 * Creates a new SelectionRange
+	 * @param range the range.
+	 * @param parent an optional parent.
+	 */
+	export function create(range: Range, parent?: SelectionRange): SelectionRange {
+		return { range, parent };
+	}
+
+	export function is(value: any): value is SelectionRange {
+		let candidate = value as SelectionRange;
+		return candidate !== undefined && Range.is(candidate.range) && (candidate.parent === undefined || SelectionRange.is(candidate.parent));
+	}
+}
+
+/**
+ * Represents programming constructs like functions or constructors in the context
+ * of call hierarchy.
+ *
+ * @since 3.16.0
+ */
+export interface CallHierarchyItem {
+	/**
+	 * The name of this item.
+	 */
+	name: string;
+
+	/**
+	 * The kind of this item.
+	 */
+	kind: SymbolKind;
+
+	/**
+	 * Tags for this item.
+	 */
+	tags?: SymbolTag[];
+
+	/**
+	 * More detail for this item, e.g. the signature of a function.
+	 */
+	detail?: string;
+
+	/**
+	 * The resource identifier of this item.
+	 */
+	uri: DocumentUri;
+
+	/**
+	 * The range enclosing this symbol not including leading/trailing whitespace but everything else, e.g. comments and code.
+	 */
+	range: Range;
+
+	/**
+	 * The range that should be selected and revealed when this symbol is being picked, e.g. the name of a function.
+	 * Must be contained by the [`range`](#CallHierarchyItem.range).
+	 */
+	selectionRange: Range;
+
+	/**
+	 * A data entry field that is preserved between a call hierarchy prepare and
+	 * incoming calls or outgoing calls requests.
+	 */
+	data?: unknown;
+}
+
+/**
+ * Represents an incoming call, e.g. a caller of a method or constructor.
+ *
+ * @since 3.16.0
+ */
+export interface CallHierarchyIncomingCall {
+
+	/**
+	 * The item that makes the call.
+	 */
+	from: CallHierarchyItem;
+
+	/**
+	 * The ranges at which the calls appear. This is relative to the caller
+	 * denoted by [`this.from`](#CallHierarchyIncomingCall.from).
+	 */
+	fromRanges: Range[];
+}
+
+/**
+ * Represents an outgoing call, e.g. calling a getter from a method or a method from a constructor etc.
+ *
+ * @since 3.16.0
+ */
+export interface CallHierarchyOutgoingCall {
+
+	/**
+	 * The item that is called.
+	 */
+	to: CallHierarchyItem;
+
+	/**
+	 * The range at which this item is called. This is the range relative to the caller, e.g the item
+	 * passed to [`provideCallHierarchyOutgoingCalls`](#CallHierarchyItemProvider.provideCallHierarchyOutgoingCalls)
+	 * and not [`this.to`](#CallHierarchyOutgoingCall.to).
+	 */
+	fromRanges: Range[];
+}
+
 export const EOL: string[] = ['\n', '\r\n', '\r'];
 
 /**
- * A simple text document. Not to be implemented.
+ * A simple text document. Not to be implemented. The document keeps the content
+ * as string.
+ *
+ * @deprecated Use the text document from the new vscode-languageserver-textdocument package.
  */
 export interface TextDocument {
 
@@ -2069,7 +3265,7 @@ export interface TextDocument {
 	 *
 	 * @readonly
 	 */
-	readonly uri: string;
+	readonly uri: DocumentUri;
 
 	/**
 	 * The identifier of the language associated with this document.
@@ -2084,7 +3280,7 @@ export interface TextDocument {
 	 *
 	 * @readonly
 	 */
-	readonly version: number;
+	readonly version: integer;
 
 	/**
 	 * Get the text of this document. A substring can be retrieved by
@@ -2108,7 +3304,7 @@ export interface TextDocument {
 	 * @param offset A zero-based offset.
 	 * @return A valid [position](#Position).
 	 */
-	positionAt(offset: number): Position;
+	positionAt(offset: uinteger): Position;
 
 	/**
 	 * Converts the position to a zero-based offset.
@@ -2118,16 +3314,19 @@ export interface TextDocument {
 	 * @param position A position.
 	 * @return A valid zero-based offset.
 	 */
-	offsetAt(position: Position): number;
+	offsetAt(position: Position): uinteger;
 
 	/**
 	 * The number of lines in this document.
 	 *
 	 * @readonly
 	 */
-	readonly lineCount: number;
+	readonly lineCount: uinteger;
 }
 
+/**
+ * @deprecated Use the text document from the new vscode-languageserver-textdocument package.
+ */
 export namespace TextDocument {
 	/**
 	 * Creates a new ITextDocument literal from the given uri and content.
@@ -2135,7 +3334,7 @@ export namespace TextDocument {
 	 * @param languageId  The document's language Id.
 	 * @param content The document's content.
 	 */
-	export function create(uri: string, languageId: string, version: number, content: string): TextDocument {
+	export function create(uri: DocumentUri, languageId: string, version: integer, content: string): TextDocument {
 		return new FullTextDocument(uri, languageId, version, content);
 	}
 	/**
@@ -2143,7 +3342,7 @@ export namespace TextDocument {
 	 */
 	export function is(value: any): value is TextDocument {
 		let candidate = value as TextDocument;
-		return Is.defined(candidate) && Is.string(candidate.uri) && (Is.undefined(candidate.languageId) || Is.string(candidate.languageId)) && Is.number(candidate.lineCount)
+		return Is.defined(candidate) && Is.string(candidate.uri) && (Is.undefined(candidate.languageId) || Is.string(candidate.languageId)) && Is.uinteger(candidate.lineCount)
 			&& Is.func(candidate.getText) && Is.func(candidate.positionAt) && Is.func(candidate.offsetAt) ? true : false;
 	}
 
@@ -2164,7 +3363,7 @@ export namespace TextDocument {
 			if (endOffset <= lastModifiedOffset) {
 				text = text.substring(0, startOffset) + e.newText + text.substring(endOffset, text.length);
 			} else {
-				throw new Error('Ovelapping edit');
+				throw new Error('Overlapping edit');
 			}
 			lastModifiedOffset = startOffset;
 		}
@@ -2207,86 +3406,52 @@ export namespace TextDocument {
 }
 
 /**
- * Event to signal changes to a simple text document.
- */
-export interface TextDocumentChangeEvent {
-	/**
-	 * The document that has changed.
-	 */
-	document: TextDocument;
-}
-
-/**
- * Represents reasons why a text document is saved.
- */
-export namespace TextDocumentSaveReason {
-
-	/**
-	 * Manually triggered, e.g. by the user pressing save, by starting debugging,
-	 * or by an API call.
-	 */
-	export const Manual: 1 = 1;
-
-	/**
-	 * Automatic after a delay.
-	 */
-	export const AfterDelay: 2 = 2;
-
-	/**
-	 * When the editor lost focus.
-	 */
-	export const FocusOut: 3 = 3;
-}
-
-export type TextDocumentSaveReason = 1 | 2 | 3;
-
-export interface TextDocumentWillSaveEvent {
-	/**
-	 * The document that will be saved
-	 */
-	document: TextDocument;
-
-	/**
-	 * The reason why save was triggered.
-	 */
-	reason: TextDocumentSaveReason;
-}
-
-/**
  * An event describing a change to a text document. If range and rangeLength are omitted
  * the new text is considered to be the full content of the document.
+ *
+ * @deprecated Use the text document from the new vscode-languageserver-textdocument package.
  */
-export interface TextDocumentContentChangeEvent {
+type TextDocumentContentChangeEvent = {
 	/**
 	 * The range of the document that changed.
 	 */
-	range?: Range;
+	range: Range;
 
 	/**
-	 * The length of the range that got replaced.
+	 * The optional length of the range that got replaced.
+	 *
+	 * @deprecated use range instead.
 	 */
-	rangeLength?: number;
+	rangeLength?: uinteger;
 
 	/**
-	 * The new text of the document.
+	 * The new text for the provided range.
 	 */
 	text: string;
-}
+} | {
+	/**
+	 * The new text of the whole document.
+	 */
+	text: string;
+};
 
+/**
+ * @deprecated Use the text document from the new vscode-languageserver-textdocument package.
+ */
 class FullTextDocument implements TextDocument {
 
-	private _uri: string;
+	private _uri: DocumentUri;
 	private _languageId: string;
-	private _version: number;
+	private _version: integer;
 	private _content: string;
-	private _lineOffsets: number[] | null;
+	private _lineOffsets: uinteger[] | undefined;
 
-	public constructor(uri: string, languageId: string, version: number, content: string) {
+	public constructor(uri: DocumentUri, languageId: string, version: integer, content: string) {
 		this._uri = uri;
 		this._languageId = languageId;
 		this._version = version;
 		this._content = content;
-		this._lineOffsets = null;
+		this._lineOffsets = undefined;
 	}
 
 	public get uri(): string {
@@ -2297,7 +3462,7 @@ class FullTextDocument implements TextDocument {
 		return this._languageId;
 	}
 
-	public get version(): number {
+	public get version(): integer {
 		return this._version;
 	}
 
@@ -2310,15 +3475,15 @@ class FullTextDocument implements TextDocument {
 		return this._content;
 	}
 
-	public update(event: TextDocumentContentChangeEvent, version: number): void {
+	public update(event: TextDocumentContentChangeEvent, version: integer): void {
 		this._content = event.text;
 		this._version = version;
-		this._lineOffsets = null;
+		this._lineOffsets = undefined;
 	}
 
-	private getLineOffsets(): number[] {
-		if (this._lineOffsets === null) {
-			let lineOffsets: number[] = [];
+	private getLineOffsets(): uinteger[] {
+		if (this._lineOffsets === undefined) {
+			let lineOffsets: uinteger[] = [];
 			let text = this._content;
 			let isLineStart = true;
 			for (let i = 0; i < text.length; i++) {
@@ -2340,7 +3505,7 @@ class FullTextDocument implements TextDocument {
 		return this._lineOffsets;
 	}
 
-	public positionAt(offset: number) {
+	public positionAt(offset: uinteger) {
 		offset = Math.max(Math.min(offset, this._content.length), 0);
 
 		let lineOffsets = this.getLineOffsets();
@@ -2401,6 +3566,18 @@ namespace Is {
 
 	export function number(value: any): value is number {
 		return toString.call(value) === '[object Number]';
+	}
+
+	export function numberRange(value: any, min: number, max: number): value is number {
+		return toString.call(value) === '[object Number]' && min <= value && value <= max;
+	}
+
+	export function integer(value: any): value is integer {
+		return toString.call(value) === '[object Number]' && -2147483648 <= value && value <= 2147483647;
+	}
+
+	export function uinteger(value: any): value is uinteger {
+		return toString.call(value) === '[object Number]' && 0 <= value && value <= 2147483647;
 	}
 
 	export function func(value: any): value is Function {
